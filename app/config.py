@@ -1,7 +1,15 @@
 import os
+import sys
 from pathlib import Path
 
 APP_NAME = "FeederComp"
+
+
+def get_bundle_dir() -> Path:
+    """Root directory: sys._MEIPASS when frozen (PyInstaller), else project root."""
+    if getattr(sys, 'frozen', False):
+        return Path(sys._MEIPASS)
+    return Path(__file__).resolve().parent.parent
 
 
 def get_data_dir() -> Path:

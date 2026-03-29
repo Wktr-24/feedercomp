@@ -46,7 +46,9 @@ CREATE TABLE IF NOT EXISTS competitors (
 );
 """
 
-_SEED_DATA_PATH = Path(__file__).resolve().parent.parent / "seed_data" / "venues.json"
+from app.config import get_bundle_dir
+
+_SEED_DATA_PATH = get_bundle_dir() / "seed_data" / "venues.json"
 
 
 def get_connection(db_path: Path) -> sqlite3.Connection:

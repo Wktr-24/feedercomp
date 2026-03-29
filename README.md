@@ -11,35 +11,43 @@ Program desktopowy do zarządzania zawodami wędkarskimi (spinning) dla klubu WK
 - Generowanie PDF (klasyfikacja, lista zwycięzców, arkusze sektorów)
 - Drukowanie wyników na przenośnej drukarce
 
-## Wymagania
+## Dla taty — uruchamianie
 
-- Windows 10 lub 11
-- Python 3.10 lub nowszy (pobrać z https://www.python.org/downloads/)
-  - **Ważne:** przy instalacji zaznaczyć ✅ "Add Python to PATH"
+Plik `FeederComp.exe` — kliknij dwukrotnie. Nie wymaga instalacji.
 
-## Instalacja i uruchomienie
+Dane zapisują się automatycznie w `%APPDATA%\FeederComp\data.db` — przetrwają aktualizację programu.
+
+Predefiniowane łowiska: Stawy Siedleckie (50 stanowisk, 5 sektorów) i Lasomin (34 stanowiska).
+
+## Dla developera — budowanie .exe
+
+### Wymagania
+
+- Windows 10/11
+- Python 3.10+ (https://www.python.org/downloads/) — przy instalacji zaznaczyć "Add Python to PATH"
+
+### Szybkie budowanie
+
+Kliknij dwukrotnie `build.bat` — zbuduje `dist\FeederComp.exe`.
+
+### Ręczne budowanie
 
 ```cmd
-cd program-dla-taty
 python -m venv .venv
+.venv\Scripts\pip install customtkinter reportlab pyinstaller
+.venv\Scripts\pyinstaller --onefile --windowed --name=FeederComp --add-data "seed_data;seed_data" --collect-all customtkinter app\main.py
+```
+
+### Uruchamianie w trybie developerskim (bez budowania .exe)
+
+```cmd
 .venv\Scripts\pip install customtkinter reportlab
 .venv\Scripts\python -m app.main
 ```
 
-## Budowanie pliku .exe (opcjonalne)
-
-Aby stworzyć samodzielny plik `.exe`, który działa bez instalacji Pythona:
+### Testy
 
 ```cmd
-.venv\Scripts\pip install pyinstaller
-.venv\Scripts\pyinstaller --onefile --windowed --name=FeederComp app\main.py
+.venv\Scripts\pip install pytest
+.venv\Scripts\pytest tests/ -v
 ```
-
-Gotowy plik: `dist\FeederComp.exe` — skopiować na pulpit i kliknąć.
-
-## Dane
-
-Baza danych (SQLite) tworzy się automatycznie przy pierwszym uruchomieniu w folderze:
-`%APPDATA%\FeederComp\data.db`
-
-Predefiniowane łowiska: Stawy Siedleckie (50 stanowisk, 5 sektorów) i Lasomin (34 stanowiska).
