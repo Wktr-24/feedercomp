@@ -1,0 +1,13 @@
+from dataclasses import dataclass
+from typing import Optional
+
+
+@dataclass
+class Competition:
+    id: int
+    venue_id: int
+    date: str
+    name: Optional[str] = None
+    max_competitors: int = 50
+    winner_places: int = 3
+    created_at: Optional[str] = None
