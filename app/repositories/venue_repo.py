@@ -4,7 +4,7 @@ from app.models.venue import Venue, VenueSector
 
 
 def get_all(conn: sqlite3.Connection) -> list[Venue]:
-    rows = conn.execute("SELECT id, name, total_stations FROM venues ORDER BY name").fetchall()
+    rows = conn.execute("SELECT id, name, total_stations FROM venues ORDER BY id").fetchall()
     return [Venue(**row) for row in rows]
 
 

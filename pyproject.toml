@@ -7,6 +7,9 @@ dependencies = [
     "reportlab",
 ]
 
+[tool.setuptools.packages.find]
+include = ["app*"]
+
 [project.optional-dependencies]
 dev = [
     "pytest",

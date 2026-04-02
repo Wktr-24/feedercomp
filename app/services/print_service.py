@@ -8,6 +8,12 @@ from reportlab.lib.units import mm
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+
+_FONT_DIR = os.path.join(os.environ.get('WINDIR', r'C:\Windows'), 'Fonts')
+pdfmetrics.registerFont(TTFont('Arial', os.path.join(_FONT_DIR, 'arial.ttf')))
+pdfmetrics.registerFont(TTFont('Arial-Bold', os.path.join(_FONT_DIR, 'arialbd.ttf')))
 
 
 class PrintService:
@@ -25,6 +31,7 @@ class PrintService:
         title_style = ParagraphStyle(
             'CustomTitle',
             parent=styles['Title'],
+            fontName='Arial-Bold',
             fontSize=16,
             alignment=TA_CENTER,
             spaceAfter=2*mm,
@@ -32,6 +39,7 @@ class PrintService:
         subtitle_style = ParagraphStyle(
             'CustomSubtitle',
             parent=styles['Normal'],
+            fontName='Arial',
             fontSize=12,
             alignment=TA_CENTER,
             spaceAfter=2*mm,
@@ -60,9 +68,9 @@ class PrintService:
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2B5797')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Arial-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 10),
-            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTNAME', (0, 1), (-1, -1), 'Arial'),
             ('FONTSIZE', (0, 1), (-1, -1), 9),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
             ('TOPPADDING', (0, 1), (-1, -1), 4),
@@ -85,7 +93,7 @@ class PrintService:
 
         styles = getSampleStyleSheet()
         sector_style = ParagraphStyle('SectorTitle', parent=styles['Heading2'],
-                                       alignment=TA_CENTER, fontSize=14)
+                                       fontName='Arial-Bold', alignment=TA_CENTER, fontSize=14)
         elements.append(Paragraph(f"Sektor {sector_name}", sector_style))
         elements.append(Spacer(1, 3*mm))
 
@@ -123,7 +131,7 @@ class PrintService:
 
         styles = getSampleStyleSheet()
         title = ParagraphStyle('ClassTitle', parent=styles['Heading2'],
-                                alignment=TA_CENTER, fontSize=14)
+                                fontName='Arial-Bold', alignment=TA_CENTER, fontSize=14)
         elements.append(Paragraph("KLASYFIKACJA KOŃCOWA", title))
         elements.append(Spacer(1, 3*mm))
 
@@ -165,7 +173,7 @@ class PrintService:
 
         styles = getSampleStyleSheet()
         title = ParagraphStyle('WinnersTitle', parent=styles['Heading2'],
-                                alignment=TA_CENTER, fontSize=14)
+                                fontName='Arial-Bold', alignment=TA_CENTER, fontSize=14)
         elements.append(Paragraph("ZWYCIĘZCY — NAGRODZENI", title))
         elements.append(Spacer(1, 3*mm))
 
