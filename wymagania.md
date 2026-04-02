@@ -63,7 +63,26 @@ Program do zarządzania zawodami wędkarskimi (spinning) organizowanymi przez kl
 
 - Gdy ktoś nie dojedzie — usunięcie stanowisk skrajnych z sektora
 - Cel: zachowanie równej liczby zawodników między sektorami
-- Decyzja manualna organizatora
+- **Zawsze robione ręcznie** — organizator sam decyduje które stanowiska usunąć
+- Program może proponować, ale organizator musi mieć pełną kontrolę
+
+**Szczegóły z transkrypcji (cytaty organizatora):**
+
+Algorytm ręczny:
+> "Jeżeli tylko jeden wypadnie, to odrzucamy jedynki. Jeżeli wypadnie na przykład dwóch, to odrzucamy jedynki z tej strony i z tej strony."
+
+Konkretne przykłady stanowisk do odrzucenia (wskazywane na diagramie łowiska):
+> "Tu odrzucę jedynkę. I tutaj odrzucę na przykład dwudziestą piątkę. Albo odrzucimy jedynkę i tutaj odrzucimy dwudziestą szóstą."
+
+Zasada ogólna:
+> "Raczej skrajne odrzucamy."
+
+Kluczowe — musi być ręcznie:
+> "Muszę mieć możliwość manualnego, manualnej zmiany."
+> "To zawsze będzie, będzie manualnie robione."
+
+Cel:
+> "Nie chcemy zrobić, że tutaj będzie zawodników dziesięciu, a tu ośmiu. To też jest niesprawiedliwe."
 
 ### G. Wydruki / eksport
 
