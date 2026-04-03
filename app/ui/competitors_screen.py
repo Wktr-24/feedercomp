@@ -277,9 +277,17 @@ class CompetitorsScreen(ctk.CTkFrame):
         self._refresh_table()
 
     def _set_all_present(self):
+        conn = self.app.get_connection()
+        try:
+            total = len(competitor_repo.get_all(conn, self.app.competition_id))
+        finally:
+            conn.close()
+
+        count = min(total, self.max_competitors)
         if not messagebox.askyesno(
             "Potwierdzenie",
-            f"Oznaczyć pierwszych {self.max_competitors} zawodników jako obecnych?",
+            f"Oznaczyć pierwszych {count} zawodników jako obecnych?\n"
+            "(Wcześniejsze oznaczenia obecności zostaną zresetowane)",
         ):
             return
 

@@ -113,11 +113,19 @@ def search_by_name(conn: sqlite3.Connection, competition_id: int, query: str) ->
 
 def set_all_present(conn: sqlite3.Connection, competition_id: int, limit: int | None = None) -> None:
     if limit is not None:
-        conn.execute(
-            "UPDATE competitors SET is_present = 1 WHERE id IN ("
-            "SELECT id FROM competitors WHERE competition_id = ? ORDER BY list_number LIMIT ?)",
-            (competition_id, limit),
-        )
+        conn.execute("UPDATE competitors SET is_present = 0 WHERE competition_id = ? AND station_number IS NULL", (competition_id,))
+        locked_present = conn.execute(
+            "SELECT COUNT(*) FROM competitors WHERE competition_id = ? AND is_present = 1",
+            (competition_id,),
+        ).fetchone()[0]
+        remaining = max(0, limit - locked_present)
+        if remaining > 0:
+            conn.execute(
+                "UPDATE competitors SET is_present = 1 WHERE id IN ("
+                "SELECT id FROM competitors WHERE competition_id = ? AND is_present = 0 "
+                "ORDER BY list_number LIMIT ?)",
+                (competition_id, remaining),
+            )
     else:
         conn.execute("UPDATE competitors SET is_present = 1 WHERE competition_id = ?", (competition_id,))
 
