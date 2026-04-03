@@ -87,6 +87,15 @@ class EditCompetitorDialog(ctk.CTkToplevel):
 
         if station_changed:
             if station_str == "":
+                if self.competitor.weight_grams > 0:
+                    messagebox.showwarning(
+                        "Błąd",
+                        "Nie można usunąć stanowiska zawodnikowi z wpisaną wagą. Najpierw wyzeruj wagę.",
+                        parent=self,
+                    )
+                    return
+                if not messagebox.askyesno("Potwierdzenie", "Usunąć przypisanie stanowiska?", parent=self):
+                    return
                 # Clear station assignment
                 conn = self.app.get_connection()
                 try:

@@ -255,12 +255,20 @@ class CompetitorsScreen(ctk.CTkFrame):
                     return
             else:
                 if competitor.station_number is not None:
-                    if not messagebox.askyesno(
-                        "Potwierdzenie",
-                        f"Zawodnik ma przypisane stanowisko {competitor.station_number}. "
-                        "Usunąć przypisanie?",
-                    ):
-                        return
+                    if competitor.weight_grams > 0:
+                        if not messagebox.askyesno(
+                            "Potwierdzenie",
+                            "Zawodnik ma wpisaną wagę. Oznaczenie jako nieobecnego wyczyści stanowisko i wagę. Kontynuować?",
+                        ):
+                            return
+                        competitor_repo.update_weight(conn, competitor_id, 0)
+                    else:
+                        if not messagebox.askyesno(
+                            "Potwierdzenie",
+                            f"Zawodnik ma przypisane stanowisko {competitor.station_number}. "
+                            "Usunąć przypisanie?",
+                        ):
+                            return
                     competitor_repo.update_station(conn, competitor_id, None, None)
             competitor_repo.update_presence(conn, competitor_id, not competitor.is_present)
             conn.commit()

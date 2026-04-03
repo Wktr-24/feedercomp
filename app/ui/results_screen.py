@@ -127,6 +127,7 @@ class ResultsScreen(ctk.CTkFrame):
     def _refresh_classification(self, conn):
         self.class_tree.delete(*self.class_tree.get_children())
         competitors = competitor_repo.get_all(conn, self.app.competition_id)
+        competitors = [c for c in competitors if c.sector_name is not None]
 
         with_place = [c for c in competitors if c.final_place is not None]
         without_place = [c for c in competitors if c.final_place is None]

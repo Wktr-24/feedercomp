@@ -141,6 +141,7 @@ class PrintService:
 
         data = [['MIEJSCE', 'IMIĘ I NAZWISKO', 'SEKTOR', 'PKT SEKT.', 'WAGA (kg)']]
         competitors = competitor_repo.get_all(conn, competition_id)
+        competitors = [c for c in competitors if c.sector_name is not None]
 
         with_place = sorted([c for c in competitors if c.final_place is not None], key=lambda c: c.final_place)
         without_place = sorted(
