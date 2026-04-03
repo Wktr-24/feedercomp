@@ -7,6 +7,7 @@ from app.repositories import competitor_repo, competition_repo, venue_repo
 from app.services.print_service import PrintService
 from app.services.ranking_service import RankingService
 from app.services.sector_service import SectorService
+from app.utils import configure_treeview_style, format_weight_kg
 
 
 class ResultsScreen(ctk.CTkFrame):
@@ -38,9 +39,7 @@ class ResultsScreen(ctk.CTkFrame):
         widths = (60, 250, 60, 80, 80, 100)
         anchors = ("center", "w", "center", "center", "center", "center")
 
-        style = ttk.Style()
-        style.configure("Treeview", font=("Segoe UI", 13), rowheight=28)
-        style.configure("Treeview.Heading", font=("Segoe UI", 13, "bold"))
+        configure_treeview_style()
 
         self.class_tree = ttk.Treeview(tab, columns=columns, show="headings", selectmode="browse")
         for col, heading, width, anchor in zip(columns, headings, widths, anchors):
@@ -134,7 +133,7 @@ class ResultsScreen(ctk.CTkFrame):
                 c.sector_name or "",
                 str(c.sector_points) if c.sector_points is not None else "",
                 c.weight_grams,
-                self._format_weight_kg(c.weight_grams),
+                format_weight_kg(c.weight_grams),
             ))
 
     def _refresh_winners(self, conn):
@@ -151,13 +150,8 @@ class ResultsScreen(ctk.CTkFrame):
                 str(c.final_place) if c.final_place is not None else "-",
                 c.full_name,
                 c.weight_grams,
-                self._format_weight_kg(c.weight_grams),
+                format_weight_kg(c.weight_grams),
             ))
-
-    def _format_weight_kg(self, grams):
-        if grams == 0:
-            return "0"
-        return f"{grams / 1000:.3f}".replace(".", ",")
 
     def _get_comp_and_venue(self, conn):
         comp = competition_repo.get_by_id(conn, self.app.competition_id)

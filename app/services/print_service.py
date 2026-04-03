@@ -11,27 +11,31 @@ from reportlab.lib.enums import TA_CENTER
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
-_FONT_DIR = os.path.join(os.environ.get('WINDIR', r'C:\Windows'), 'Fonts')
-pdfmetrics.registerFont(TTFont('Arial', os.path.join(_FONT_DIR, 'arial.ttf')))
-pdfmetrics.registerFont(TTFont('Arial-Bold', os.path.join(_FONT_DIR, 'arialbd.ttf')))
-
+from app.utils import format_weight_kg
 
 class PrintService:
     def __init__(self):
         self.output_dir = Path(tempfile.gettempdir()) / "FeederComp"
         self.output_dir.mkdir(exist_ok=True)
+        self._register_fonts()
 
-    def _format_weight_kg(self, grams: int) -> str:
-        if grams == 0:
-            return "0"
-        return f"{grams / 1000:.3f}".replace(".", ",")
+    def _register_fonts(self):
+        try:
+            font_dir = os.path.join(os.environ.get('WINDIR', r'C:\Windows'), 'Fonts')
+            pdfmetrics.registerFont(TTFont('Arial', os.path.join(font_dir, 'arial.ttf')))
+            pdfmetrics.registerFont(TTFont('Arial-Bold', os.path.join(font_dir, 'arialbd.ttf')))
+            self.font_name = 'Arial'
+            self.font_name_bold = 'Arial-Bold'
+        except Exception:
+            self.font_name = 'Helvetica'
+            self.font_name_bold = 'Helvetica-Bold'
 
     def _build_header(self, venue_name: str, comp_date: str, comp_name: str | None) -> list:
         styles = getSampleStyleSheet()
         title_style = ParagraphStyle(
             'CustomTitle',
             parent=styles['Title'],
-            fontName='Arial-Bold',
+            fontName=self.font_name_bold,
             fontSize=16,
             alignment=TA_CENTER,
             spaceAfter=2*mm,
@@ -39,7 +43,7 @@ class PrintService:
         subtitle_style = ParagraphStyle(
             'CustomSubtitle',
             parent=styles['Normal'],
-            fontName='Arial',
+            fontName=self.font_name,
             fontSize=12,
             alignment=TA_CENTER,
             spaceAfter=2*mm,
@@ -68,9 +72,9 @@ class PrintService:
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2B5797')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Arial-Bold'),
+            ('FONTNAME', (0, 0), (-1, 0), self.font_name_bold),
             ('FONTSIZE', (0, 0), (-1, 0), 10),
-            ('FONTNAME', (0, 1), (-1, -1), 'Arial'),
+            ('FONTNAME', (0, 1), (-1, -1), self.font_name),
             ('FONTSIZE', (0, 1), (-1, -1), 9),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
             ('TOPPADDING', (0, 1), (-1, -1), 4),
@@ -93,7 +97,7 @@ class PrintService:
 
         styles = getSampleStyleSheet()
         sector_style = ParagraphStyle('SectorTitle', parent=styles['Heading2'],
-                                       fontName='Arial-Bold', alignment=TA_CENTER, fontSize=14)
+                                       fontName=self.font_name_bold, alignment=TA_CENTER, fontSize=14)
         elements.append(Paragraph(f"Sektor {sector_name}", sector_style))
         elements.append(Spacer(1, 3*mm))
 
@@ -106,7 +110,7 @@ class PrintService:
             data.append([
                 str(c.station_number or ""),
                 c.full_name,
-                self._format_weight_kg(c.weight_grams),
+                format_weight_kg(c.weight_grams),
                 place,
             ])
 
@@ -131,7 +135,7 @@ class PrintService:
 
         styles = getSampleStyleSheet()
         title = ParagraphStyle('ClassTitle', parent=styles['Heading2'],
-                                fontName='Arial-Bold', alignment=TA_CENTER, fontSize=14)
+                                fontName=self.font_name_bold, alignment=TA_CENTER, fontSize=14)
         elements.append(Paragraph("KLASYFIKACJA KOŃCOWA", title))
         elements.append(Spacer(1, 3*mm))
 
@@ -151,7 +155,7 @@ class PrintService:
                 c.full_name,
                 c.sector_name or "",
                 str(c.sector_points) if c.sector_points is not None else "",
-                self._format_weight_kg(c.weight_grams),
+                format_weight_kg(c.weight_grams),
             ])
 
         col_widths = [55, 200, 55, 70, 80]
@@ -176,7 +180,7 @@ class PrintService:
 
         styles = getSampleStyleSheet()
         title = ParagraphStyle('WinnersTitle', parent=styles['Heading2'],
-                                fontName='Arial-Bold', alignment=TA_CENTER, fontSize=14)
+                                fontName=self.font_name_bold, alignment=TA_CENTER, fontSize=14)
         elements.append(Paragraph("ZWYCIĘZCY — NAGRODZENI", title))
         elements.append(Spacer(1, 3*mm))
 
@@ -188,7 +192,7 @@ class PrintService:
             data.append([
                 str(c.final_place) if c.final_place is not None else "-",
                 c.full_name,
-                self._format_weight_kg(c.weight_grams),
+                format_weight_kg(c.weight_grams),
             ])
 
         col_widths = [60, 250, 100]

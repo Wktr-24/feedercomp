@@ -3,16 +3,10 @@ from tkinter import messagebox, ttk
 
 import customtkinter as ctk
 
+from app.constants import PAYMENT_DISPLAY, PAYMENT_LABELS, PAYMENT_VALUES
 from app.repositories import competitor_repo, competition_repo
 from app.services.sector_service import SectorService
-
-_PAYMENT_LABELS = {
-    "paid": "TAK",
-    "on_site": "Na miejscu",
-}
-
-_PAYMENT_VALUES = ["paid", "on_site"]
-_PAYMENT_DISPLAY = ["TAK", "Na miejscu"]
+from app.utils import configure_treeview_style
 
 _COLUMNS = ("nr", "name", "phone", "payment", "present", "station", "sector")
 _HEADINGS = ("Nr", "Imi\u0119 i Nazwisko", "Telefon", "Op\u0142ata", "Obecny", "Stanowisko", "Sektor")
@@ -54,9 +48,9 @@ class CompetitorsScreen(ctk.CTkFrame):
         self.phone_entry.pack(side="left", padx=2)
 
         ctk.CTkLabel(form, text="Op\u0142ata:", font=("Segoe UI", 14)).pack(side="left", padx=(10, 2))
-        self.payment_var = ctk.StringVar(value=_PAYMENT_DISPLAY[0])
+        self.payment_var = ctk.StringVar(value=PAYMENT_DISPLAY[0])
         payment_menu = ctk.CTkOptionMenu(
-            form, variable=self.payment_var, values=_PAYMENT_DISPLAY, width=120,
+            form, variable=self.payment_var, values=PAYMENT_DISPLAY, width=120,
         )
         payment_menu.pack(side="left", padx=2)
 
@@ -93,9 +87,7 @@ class CompetitorsScreen(ctk.CTkFrame):
         table_frame = ctk.CTkFrame(self)
         table_frame.pack(fill="both", expand=True, padx=5, pady=2)
 
-        style = ttk.Style()
-        style.configure("Treeview", font=("Segoe UI", 13), rowheight=28)
-        style.configure("Treeview.Heading", font=("Segoe UI", 13, "bold"))
+        configure_treeview_style()
 
         self.tree = ttk.Treeview(
             table_frame,
@@ -187,7 +179,7 @@ class CompetitorsScreen(ctk.CTkFrame):
                 c.list_number,
                 c.full_name,
                 c.phone or "",
-                _PAYMENT_LABELS.get(c.payment_status, c.payment_status),
+                PAYMENT_LABELS.get(c.payment_status, c.payment_status),
                 "Tak" if c.is_present else "Nie",
                 "" if c.station_number is None else c.station_number,
                 "" if c.sector_name is None else c.sector_name,
@@ -205,8 +197,8 @@ class CompetitorsScreen(ctk.CTkFrame):
             messagebox.showwarning("Błąd", "Numer telefonu musi mieć dokładnie 9 cyfr.")
             return
         display_payment = self.payment_var.get()
-        idx = _PAYMENT_DISPLAY.index(display_payment) if display_payment in _PAYMENT_DISPLAY else 0
-        payment_status = _PAYMENT_VALUES[idx]
+        idx = PAYMENT_DISPLAY.index(display_payment) if display_payment in PAYMENT_DISPLAY else 0
+        payment_status = PAYMENT_VALUES[idx]
 
         conn = self.app.get_connection()
         try:
@@ -224,12 +216,13 @@ class CompetitorsScreen(ctk.CTkFrame):
         conn = self.app.get_connection()
         try:
             competitor_repo.add(conn, self.app.competition_id, list_number, name, phone, payment_status)
+            conn.commit()
         finally:
             conn.close()
 
         self.name_entry.delete(0, "end")
         self.phone_entry.delete(0, "end")
-        self.payment_var.set(_PAYMENT_DISPLAY[0])
+        self.payment_var.set(PAYMENT_DISPLAY[0])
         self._refresh_table()
 
     def _toggle_presence(self):
@@ -266,6 +259,7 @@ class CompetitorsScreen(ctk.CTkFrame):
                         return
                     competitor_repo.update_station(conn, competitor_id, None, None)
             competitor_repo.update_presence(conn, competitor_id, not competitor.is_present)
+            conn.commit()
         finally:
             conn.close()
         self._refresh_table()
@@ -280,6 +274,7 @@ class CompetitorsScreen(ctk.CTkFrame):
         conn = self.app.get_connection()
         try:
             competitor_repo.set_all_present(conn, self.app.competition_id, limit=self.max_competitors)
+            conn.commit()
         finally:
             conn.close()
         self._refresh_table()
@@ -342,6 +337,7 @@ class CompetitorsScreen(ctk.CTkFrame):
         conn = self.app.get_connection()
         try:
             competitor_repo.delete(conn, competitor_id)
+            conn.commit()
         finally:
             conn.close()
 

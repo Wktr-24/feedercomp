@@ -2,15 +2,9 @@ import sqlite3
 
 import customtkinter as ctk
 
+from app.constants import PAYMENT_DISPLAY, PAYMENT_LABELS, PAYMENT_REVERSE
 from app.repositories import competitor_repo
 from app.services.sector_service import SectorService
-
-_PAYMENT_LABELS = {
-    "paid": "TAK",
-    "on_site": "Na miejscu",
-}
-_PAYMENT_DISPLAY = ["TAK", "Na miejscu"]
-_PAYMENT_VALUES = {"TAK": "paid", "Na miejscu": "on_site"}
 
 
 class EditCompetitorDialog(ctk.CTkToplevel):
@@ -22,7 +16,7 @@ class EditCompetitorDialog(ctk.CTkToplevel):
         self.sector_service = SectorService()
 
         self.original_phone = competitor.phone or ""
-        self.original_payment = _PAYMENT_LABELS.get(competitor.payment_status, _PAYMENT_DISPLAY[0])
+        self.original_payment = PAYMENT_LABELS.get(competitor.payment_status, PAYMENT_DISPLAY[0])
         self.original_station = str(competitor.station_number) if competitor.station_number else ""
 
         self.title(f"Edycja \u2014 {competitor.full_name}")
@@ -48,7 +42,7 @@ class EditCompetitorDialog(ctk.CTkToplevel):
         self.payment_var = ctk.StringVar(value=self.original_payment)
         self.payment_var.trace_add("write", lambda *_: self._check_changes())
         ctk.CTkOptionMenu(
-            self, variable=self.payment_var, values=_PAYMENT_DISPLAY, width=200,
+            self, variable=self.payment_var, values=PAYMENT_DISPLAY, width=200,
         ).place(x=120, y=65)
 
         ctk.CTkLabel(self, text="Stanowisko:", font=("Segoe UI", 14)).place(x=20, y=110)
@@ -83,7 +77,7 @@ class EditCompetitorDialog(ctk.CTkToplevel):
         if phone and (len(phone) != 9 or not phone.isdigit()):
             messagebox.showwarning("Błąd", "Numer telefonu musi mieć dokładnie 9 cyfr.", parent=self)
             return
-        payment_status = _PAYMENT_VALUES.get(self.payment_var.get(), "paid")
+        payment_status = PAYMENT_REVERSE.get(self.payment_var.get(), "paid")
 
         station_str = self.station_entry.get().strip()
         station_changed = station_str != self.original_station
@@ -95,6 +89,7 @@ class EditCompetitorDialog(ctk.CTkToplevel):
                 try:
                     competitor_repo.update_station(conn, self.competitor.id, None, None)
                     competitor_repo.update_details(conn, self.competitor.id, phone, payment_status)
+                    conn.commit()
                 finally:
                     conn.close()
             else:
@@ -115,6 +110,7 @@ class EditCompetitorDialog(ctk.CTkToplevel):
                         self.app.venue_id, self.app.competition_id,
                     )
                     competitor_repo.update_details(conn, self.competitor.id, phone, payment_status)
+                    conn.commit()
                 except ValueError as e:
                     messagebox.showwarning("Błąd", str(e), parent=self)
                     return
@@ -127,6 +123,7 @@ class EditCompetitorDialog(ctk.CTkToplevel):
             conn = self.app.get_connection()
             try:
                 competitor_repo.update_details(conn, self.competitor.id, phone, payment_status)
+                conn.commit()
             finally:
                 conn.close()
 

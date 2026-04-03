@@ -16,7 +16,6 @@ def create(
         "VALUES (?, ?, ?, ?, ?)",
         (venue_id, date, name, max_competitors, winner_places),
     )
-    conn.commit()
     return cursor.lastrowid
 
 
@@ -39,4 +38,3 @@ def get_by_id(conn: sqlite3.Connection, competition_id: int) -> Competition | No
 
 def delete(conn: sqlite3.Connection, competition_id: int) -> None:
     conn.execute("DELETE FROM competitions WHERE id = ?", (competition_id,))
-    conn.commit()

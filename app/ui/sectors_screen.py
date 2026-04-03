@@ -5,6 +5,7 @@ import customtkinter as ctk
 from app.repositories import competitor_repo, venue_repo
 from app.services.ranking_service import RankingService
 from app.services.sector_service import SectorService
+from app.utils import configure_treeview_style, format_weight_kg
 
 
 class SectorsScreen(ctk.CTkFrame):
@@ -70,9 +71,7 @@ class SectorsScreen(ctk.CTkFrame):
         widths = (80, 250, 80, 100, 80)
         anchors = ("center", "w", "center", "center", "center")
 
-        style = ttk.Style()
-        style.configure("Treeview", font=("Segoe UI", 13), rowheight=28)
-        style.configure("Treeview.Heading", font=("Segoe UI", 13, "bold"))
+        configure_treeview_style()
 
         tree = ttk.Treeview(parent, columns=columns, show="headings", selectmode="browse")
         for col, heading, width, anchor in zip(columns, headings, widths, anchors):
@@ -120,17 +119,11 @@ class SectorsScreen(ctk.CTkFrame):
                         c.station_number or "",
                         c.full_name,
                         c.weight_grams,
-                        self._format_weight_kg(c.weight_grams),
+                        format_weight_kg(c.weight_grams),
                         place_str,
                     ))
         finally:
             conn.close()
-
-    def _format_weight_kg(self, grams):
-        if grams == 0:
-            return "0"
-        kg = grams / 1000
-        return f"{kg:.3f}".replace(".", ",")
 
     # -- Events --
 
@@ -226,6 +219,7 @@ class SectorsScreen(ctk.CTkFrame):
         conn = self.app.get_connection()
         try:
             competitor_repo.update_weight(conn, competitor_id, weight)
+            conn.commit()
         finally:
             conn.close()
 

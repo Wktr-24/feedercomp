@@ -13,6 +13,7 @@ class RankingService:
         for sector_name in sector_names:
             self.sector_service.calculate_sector_places(conn, competition_id, sector_name)
         self.calculate_final_classification(conn, competition_id)
+        conn.commit()
 
     def calculate_final_classification(self, conn: sqlite3.Connection, competition_id: int):
         all_competitors = competitor_repo.get_all(conn, competition_id)

@@ -209,6 +209,7 @@ class BalanceSectorsDialog(ctk.CTkToplevel):
                     conn, self.competition_id, self.venue_id,
                     station_number, sector_name,
                 )
+            conn.commit()
         finally:
             conn.close()
 
@@ -229,6 +230,7 @@ class BalanceSectorsDialog(ctk.CTkToplevel):
         conn = self.app.get_connection()
         try:
             excluded_station_repo.clear_excluded(conn, self.competition_id)
+            conn.commit()
         finally:
             conn.close()
 

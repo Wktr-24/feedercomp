@@ -57,6 +57,7 @@ class TestProposeRemovals:
     def test_targets_largest_first(self, db, venue_id, competition_id):
         excluded_station_repo.add_excluded(db, competition_id, venue_id, 1, "A")
         excluded_station_repo.add_excluded(db, competition_id, venue_id, 50, "A")
+        db.commit()
 
         proposals = self.service.propose_station_removals(db, venue_id, competition_id, 1)
         assert len(proposals) == 1
@@ -80,6 +81,7 @@ class TestAssignStationRejectsExcluded:
         db.commit()
 
         excluded_station_repo.add_excluded(db, competition_id, venue_id, 5, "A")
+        db.commit()
 
         with pytest.raises(ValueError, match="Stanowisko 5 jest wykluczone"):
             self.service.assign_station(db, competitor_id, 5, venue_id, competition_id)
@@ -101,6 +103,7 @@ class TestAssignStationRejectsExcluded:
         db.commit()
 
         excluded_station_repo.add_excluded(db, competition_id, venue_id, 5, "A")
+        db.commit()
         self.service.assign_station(db, competitor_id, 5, venue_id)
 
 
@@ -108,11 +111,13 @@ class TestExcludedRepoCrud:
     def test_add_and_check(self, db, venue_id, competition_id):
         assert not excluded_station_repo.is_excluded(db, competition_id, 5)
         excluded_station_repo.add_excluded(db, competition_id, venue_id, 5, "A")
+        db.commit()
         assert excluded_station_repo.is_excluded(db, competition_id, 5)
 
     def test_get_excluded(self, db, venue_id, competition_id):
         excluded_station_repo.add_excluded(db, competition_id, venue_id, 5, "A")
         excluded_station_repo.add_excluded(db, competition_id, venue_id, 46, "A")
+        db.commit()
         result = excluded_station_repo.get_excluded(db, competition_id)
         assert len(result) == 2
         assert result[0]["station_number"] == 5
@@ -120,11 +125,15 @@ class TestExcludedRepoCrud:
 
     def test_remove(self, db, venue_id, competition_id):
         excluded_station_repo.add_excluded(db, competition_id, venue_id, 5, "A")
+        db.commit()
         excluded_station_repo.remove_excluded(db, competition_id, 5)
+        db.commit()
         assert not excluded_station_repo.is_excluded(db, competition_id, 5)
 
     def test_clear(self, db, venue_id, competition_id):
         excluded_station_repo.add_excluded(db, competition_id, venue_id, 5, "A")
         excluded_station_repo.add_excluded(db, competition_id, venue_id, 46, "A")
+        db.commit()
         excluded_station_repo.clear_excluded(db, competition_id)
+        db.commit()
         assert len(excluded_station_repo.get_excluded(db, competition_id)) == 0

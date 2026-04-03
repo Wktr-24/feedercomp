@@ -22,7 +22,6 @@ def add_excluded(
         "VALUES (?, ?, ?, ?)",
         (competition_id, venue_id, station_number, sector_name),
     )
-    conn.commit()
 
 
 def remove_excluded(conn: sqlite3.Connection, competition_id: int, station_number: int) -> None:
@@ -30,12 +29,10 @@ def remove_excluded(conn: sqlite3.Connection, competition_id: int, station_numbe
         "DELETE FROM excluded_stations WHERE competition_id = ? AND station_number = ?",
         (competition_id, station_number),
     )
-    conn.commit()
 
 
 def clear_excluded(conn: sqlite3.Connection, competition_id: int) -> None:
     conn.execute("DELETE FROM excluded_stations WHERE competition_id = ?", (competition_id,))
-    conn.commit()
 
 
 def is_excluded(conn: sqlite3.Connection, competition_id: int, station_number: int) -> bool:

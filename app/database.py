@@ -2,6 +2,8 @@ import json
 import sqlite3
 from pathlib import Path
 
+from app.config import get_bundle_dir
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS venues (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -54,8 +56,6 @@ CREATE TABLE IF NOT EXISTS excluded_stations (
     UNIQUE(competition_id, station_number)
 );
 """
-
-from app.config import get_bundle_dir
 
 _SEED_DATA_PATH = get_bundle_dir() / "seed_data" / "venues.json"
 

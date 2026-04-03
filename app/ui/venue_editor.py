@@ -78,6 +78,14 @@ class VenueEditor(ctk.CTkFrame):
                 messagebox.showerror("Błąd", "Nieprawidłowe numery stanowisk w nowym sektorze")
                 return
 
+        all_stations = []
+        for name, stations in sectors.items():
+            for s in stations:
+                if s in all_stations:
+                    messagebox.showwarning("Błąd", f"Stanowisko {s} jest przypisane do więcej niż jednego sektora.")
+                    return
+                all_stations.append(s)
+
         conn = self.app.get_connection()
         try:
             venue_repo.update_sectors(conn, self.venue_id, sectors)

@@ -40,7 +40,6 @@ def add(
         "VALUES (?, ?, ?, ?, ?)",
         (competition_id, list_number, full_name, phone, payment_status),
     )
-    conn.commit()
     return cursor.lastrowid
 
 
@@ -74,7 +73,6 @@ def update_station(conn: sqlite3.Connection, competitor_id: int, station_number:
         "UPDATE competitors SET station_number = ?, sector_name = ? WHERE id = ?",
         (station_number, sector_name, competitor_id),
     )
-    conn.commit()
 
 
 def update_weight(conn: sqlite3.Connection, competitor_id: int, weight_grams: int) -> None:
@@ -82,7 +80,6 @@ def update_weight(conn: sqlite3.Connection, competitor_id: int, weight_grams: in
         "UPDATE competitors SET weight_grams = ? WHERE id = ?",
         (weight_grams, competitor_id),
     )
-    conn.commit()
 
 
 def update_presence(conn: sqlite3.Connection, competitor_id: int, is_present: bool) -> None:
@@ -90,7 +87,6 @@ def update_presence(conn: sqlite3.Connection, competitor_id: int, is_present: bo
         "UPDATE competitors SET is_present = ? WHERE id = ?",
         (int(is_present), competitor_id),
     )
-    conn.commit()
 
 
 def update_rankings(
@@ -104,7 +100,6 @@ def update_rankings(
         "UPDATE competitors SET sector_place = ?, sector_points = ?, final_place = ? WHERE id = ?",
         (sector_place, sector_points, final_place, competitor_id),
     )
-    conn.commit()
 
 
 def search_by_name(conn: sqlite3.Connection, competition_id: int, query: str) -> list[Competitor]:
@@ -125,7 +120,6 @@ def set_all_present(conn: sqlite3.Connection, competition_id: int, limit: int | 
         )
     else:
         conn.execute("UPDATE competitors SET is_present = 1 WHERE competition_id = ?", (competition_id,))
-    conn.commit()
 
 
 def update_details(conn: sqlite3.Connection, competitor_id: int, phone: str | None, payment_status: str) -> None:
@@ -133,9 +127,7 @@ def update_details(conn: sqlite3.Connection, competitor_id: int, phone: str | No
         "UPDATE competitors SET phone = ?, payment_status = ? WHERE id = ?",
         (phone, payment_status, competitor_id),
     )
-    conn.commit()
 
 
 def delete(conn: sqlite3.Connection, competitor_id: int) -> None:
     conn.execute("DELETE FROM competitors WHERE id = ?", (competitor_id,))
-    conn.commit()

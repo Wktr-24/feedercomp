@@ -49,7 +49,6 @@ def update_sectors(conn: sqlite3.Connection, venue_id: int, sectors: dict[str, l
                 "INSERT INTO venue_sectors (venue_id, sector_name, station_number) VALUES (?, ?, ?)",
                 (venue_id, sector_name, station),
             )
-    conn.commit()
 
 
 def create(conn: sqlite3.Connection, name: str, total_stations: int) -> int:
@@ -57,5 +56,4 @@ def create(conn: sqlite3.Connection, name: str, total_stations: int) -> int:
         "INSERT INTO venues (name, total_stations) VALUES (?, ?)",
         (name, total_stations),
     )
-    conn.commit()
     return cursor.lastrowid

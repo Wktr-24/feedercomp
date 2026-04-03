@@ -201,6 +201,7 @@ def _setup_competition(db):
             competitor_repo.update_station(db, comp_id, station, sector_name)
             competitor_repo.update_weight(db, comp_id, weight)
             list_number += 1
+    db.commit()
 
     return competition_id, venue_id
 
@@ -314,6 +315,7 @@ class TestExAequo:
             cid = competitor_repo.add(db, comp_id, station, name)
             competitor_repo.update_station(db, cid, station, "A")
             competitor_repo.update_weight(db, cid, weight)
+        db.commit()
 
         service = SectorService()
         service.calculate_sector_places(db, comp_id, "A")
@@ -348,6 +350,7 @@ class TestExAequo:
             cid = competitor_repo.add(db, comp_id, station, name)
             competitor_repo.update_station(db, cid, station, "B")
             competitor_repo.update_weight(db, cid, weight)
+        db.commit()
 
         service = RankingService(SectorService())
         service.calculate_all(db, comp_id, venue_id)
@@ -382,6 +385,7 @@ class TestExAequo:
             cid = competitor_repo.add(db, comp_id, station, name)
             competitor_repo.update_station(db, cid, station, "A")
             competitor_repo.update_weight(db, cid, weight)
+        db.commit()
 
         service = SectorService()
         service.calculate_sector_places(db, comp_id, "A")
@@ -416,6 +420,7 @@ class TestExAequo:
             cid = competitor_repo.add(db, comp_id, station, name)
             competitor_repo.update_station(db, cid, station, "A")
             competitor_repo.update_weight(db, cid, weight)
+        db.commit()
 
         service = SectorService()
         service.calculate_sector_places(db, comp_id, "A")
@@ -451,6 +456,7 @@ class TestExAequo:
             cid = competitor_repo.add(db, comp_id, station, name)
             competitor_repo.update_station(db, cid, station, "A")
             competitor_repo.update_weight(db, cid, weight)
+        db.commit()
 
         service = SectorService()
         service.calculate_sector_places(db, comp_id, "A")
@@ -485,6 +491,7 @@ class TestExAequo:
             cid = competitor_repo.add(db, comp_id, station, name)
             competitor_repo.update_station(db, cid, station, "B")
             competitor_repo.update_weight(db, cid, weight)
+        db.commit()
 
         service = RankingService(SectorService())
         service.calculate_all(db, comp_id, venue_id)
@@ -514,6 +521,7 @@ class TestExAequo:
         cid = competitor_repo.add(db, comp_id1, 1, "SOLO_WITH_WEIGHT")
         competitor_repo.update_station(db, cid, 1, "A")
         competitor_repo.update_weight(db, cid, 5000)
+        db.commit()
 
         service = SectorService()
         service.calculate_sector_places(db, comp_id1, "A")
@@ -532,6 +540,7 @@ class TestExAequo:
         cid = competitor_repo.add(db, comp_id2, 1, "SOLO_ZERO")
         competitor_repo.update_station(db, cid, 1, "A")
         competitor_repo.update_weight(db, cid, 0)
+        db.commit()
 
         service.calculate_sector_places(db, comp_id2, "A")
 

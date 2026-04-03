@@ -64,7 +64,7 @@ class StartScreen(ctk.CTkFrame):
 
         limits_row = ctk.CTkFrame(frame)
         limits_row.pack(fill="x", padx=15, pady=(0, 15))
-        ctk.CTkLabel(limits_row, text="Miejsc nagrodzonych:", font=("Segoe UI", 14)).pack(side="left")
+        ctk.CTkLabel(limits_row, text="Nagradzane miejsca sektorowe:", font=("Segoe UI", 14)).pack(side="left")
         self.winner_places_entry = ctk.CTkEntry(limits_row, width=60)
         self.winner_places_entry.insert(0, "3")
         self.winner_places_entry.pack(side="left", padx=(2, 0))
@@ -110,6 +110,13 @@ class StartScreen(ctk.CTkFrame):
             label_text = f"{comp.date} \u2013 {comp.name or 'Bez nazwy'} ({venue_name})"
             ctk.CTkLabel(row, text=label_text, font=("Segoe UI", 13)).pack(side="left", padx=5)
 
+            del_btn = ctk.CTkButton(
+                row, text="Usuń", width=60,
+                fg_color="#d9534f", hover_color="#c9302c",
+                command=lambda c=comp: self._delete_competition(c),
+            )
+            del_btn.pack(side="right", padx=2, pady=2)
+
             btn = ctk.CTkButton(
                 row,
                 text="Otw\u00f3rz",
@@ -151,6 +158,7 @@ class StartScreen(ctk.CTkFrame):
                 conn, venue.id, comp_date, comp_name,
                 max_competitors=venue.total_stations, winner_places=winner_places,
             )
+            conn.commit()
         finally:
             conn.close()
 
@@ -163,6 +171,17 @@ class StartScreen(ctk.CTkFrame):
             return
         venue = self.venue_map[venue_name]
         self.app.show_venue_editor(venue.id)
+
+    def _delete_competition(self, competition):
+        if not messagebox.askyesno("Potwierdzenie", f"Usunąć zawody '{competition.name or 'Bez nazwy'}'?"):
+            return
+        conn = self.app.get_connection()
+        try:
+            competition_repo.delete(conn, competition.id)
+            conn.commit()
+        finally:
+            conn.close()
+        self._refresh_competitions_list()
 
     def _open_competition(self, competition):
         self.app.on_competition_selected(competition.id, competition.venue_id)
