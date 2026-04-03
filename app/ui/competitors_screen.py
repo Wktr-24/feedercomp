@@ -161,7 +161,7 @@ class CompetitorsScreen(ctk.CTkFrame):
 
         conn = self.app.get_connection()
         try:
-            if query:
+            if len(query) >= 2:
                 competitors = competitor_repo.search_by_name(conn, self.app.competition_id, query)
             else:
                 competitors = competitor_repo.get_all(conn, self.app.competition_id)

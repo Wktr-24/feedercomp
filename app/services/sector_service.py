@@ -29,7 +29,10 @@ class SectorService:
 
         with_weight.sort(key=lambda c: c.weight_grams, reverse=True)
 
-        for place, c in enumerate(with_weight, start=1):
+        place = 0
+        for i, c in enumerate(with_weight):
+            if i == 0 or c.weight_grams != with_weight[i - 1].weight_grams:
+                place = i + 1
             competitor_repo.update_rankings(conn, c.id, place, place, c.final_place)
 
         for c in zero_weight:

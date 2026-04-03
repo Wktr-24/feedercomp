@@ -12,6 +12,8 @@ class SectorsScreen(ctk.CTkFrame):
         super().__init__(master)
         self.app = app
         self.tables = {}  # sector_name -> Treeview
+        self._search_matches = []
+        self._search_index = 0
         self._build_ui()
         self._refresh_all()
 
@@ -29,7 +31,10 @@ class SectorsScreen(ctk.CTkFrame):
         ctk.CTkLabel(top, text="Szukaj:", font=("Segoe UI", 14)).pack(side="left", padx=(10, 2))
         self.search_entry = ctk.CTkEntry(top, width=200, placeholder_text="wpisz nazwisko...")
         self.search_entry.pack(side="left", padx=2)
-        self.search_entry.bind("<KeyRelease>", self._on_search)
+        self.search_entry.bind("<KeyRelease>", self._on_search_key)
+        self.search_entry.bind("<Return>", lambda _: self._jump_to_next())
+        self.search_counter = ctk.CTkLabel(top, text="", font=("Segoe UI", 12), width=60)
+        self.search_counter.pack(side="left", padx=(2, 5))
 
         ctk.CTkLabel(top, text="Waga (g):", font=("Segoe UI", 14)).pack(side="left", padx=(20, 2))
         self.weight_entry = ctk.CTkEntry(top, width=100)
@@ -79,7 +84,8 @@ class SectorsScreen(ctk.CTkFrame):
         tree.tag_configure("even", background="#f0f0f0")
         tree.tag_configure("odd", background="#ffffff")
 
-        tree.bind("<<TreeviewSelect>>", self._on_row_select)
+        tree.bind("<ButtonRelease-1>", self._on_row_click)
+        tree.bind("<Double-1>", self._on_row_double_click)
         return tree
 
     # -- Bottom: action buttons --
@@ -124,13 +130,32 @@ class SectorsScreen(ctk.CTkFrame):
 
     # -- Events --
 
-    def _on_row_select(self, _event):
+    def _on_row_click(self, event):
+        tree = event.widget
+        if tree.identify_row(event.y):
+            self.weight_entry.focus_set()
+            self.weight_entry.select_range(0, "end")
+
+    def _on_row_double_click(self, event):
+        tree = event.widget
+        row_id = tree.identify_row(event.y)
+        if not row_id:
+            return
+        values = tree.item(row_id, "values")
+        weight_g = values[2]  # column "weight_g"
+        self.weight_entry.delete(0, "end")
+        self.weight_entry.insert(0, str(weight_g))
         self.weight_entry.focus_set()
         self.weight_entry.select_range(0, "end")
 
-    def _on_search(self, _event):
+    def _on_search_key(self, event):
+        if event.keysym == "Return":
+            return
         query = self.search_entry.get().strip()
-        if not query:
+        if len(query) < 2:
+            self._search_matches = []
+            self._search_index = 0
+            self.search_counter.configure(text="")
             return
 
         conn = self.app.get_connection()
@@ -139,21 +164,32 @@ class SectorsScreen(ctk.CTkFrame):
         finally:
             conn.close()
 
-        if not matches:
+        self._search_matches = [m for m in matches if m.sector_name and m.sector_name in self.tables]
+        self._search_index = 0
+
+        if not self._search_matches:
+            self.search_counter.configure(text="0 / 0")
             return
 
-        match = matches[0]
-        sector_name = match.sector_name
-        if not sector_name or sector_name not in self.tables:
-            return
+        self._show_current_match()
 
-        self.tabview.set(f"Sektor {sector_name}")
-        tree = self.tables[sector_name]
+    def _jump_to_next(self):
+        if not self._search_matches:
+            return
+        self._search_index = (self._search_index + 1) % len(self._search_matches)
+        self._show_current_match()
+
+    def _show_current_match(self):
+        match = self._search_matches[self._search_index]
+        total = len(self._search_matches)
+        self.search_counter.configure(text=f"{self._search_index + 1} / {total}")
+
+        self.tabview.set(f"Sektor {match.sector_name}")
+        tree = self.tables[match.sector_name]
         item_id = str(match.id)
         if tree.exists(item_id):
             tree.selection_set(item_id)
             tree.see(item_id)
-            self.weight_entry.focus_set()
 
     def _on_save_weight(self):
         selection, sector_name = self._get_current_selection()
@@ -199,10 +235,13 @@ class SectorsScreen(ctk.CTkFrame):
                     self.weight_entry.focus_set()
 
     def _get_current_selection(self):
+        current_tab = self.tabview.get()
         for sector_name, tree in self.tables.items():
-            sel = tree.selection()
-            if sel:
-                return sel[0], sector_name
+            if f"Sektor {sector_name}" == current_tab:
+                sel = tree.selection()
+                if sel:
+                    return sel[0], sector_name
+                return None, None
         return None, None
 
     def _recalculate(self):

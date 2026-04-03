@@ -290,3 +290,250 @@ class TestFullRanking:
         winner_names = [w.full_name for w in winners]
         expected_winner_names = [name for _, name, _, _, _ in EXPECTED_FINAL_CLASSIFICATION[:15]]
         assert winner_names == expected_winner_names
+
+
+class TestExAequo:
+    def test_sector_places_with_weight_tie(self, db):
+        """Two competitors with same weight get same sector place, next place is skipped."""
+        venue_id = db.execute("SELECT id FROM venues WHERE name = 'Stawy Siedleckie'").fetchone()["id"]
+        cursor = db.execute(
+            "INSERT INTO competitions (venue_id, date, name) VALUES (?, ?, ?)",
+            (venue_id, "2026-01-01", "Tie test"),
+        )
+        comp_id = cursor.lastrowid
+        db.commit()
+
+        entries = [
+            (1, "FIRST", 10000),
+            (2, "TIE_A", 8000),
+            (3, "TIE_B", 8000),
+            (4, "FOURTH", 5000),
+            (5, "ZERO", 0),
+        ]
+        for station, name, weight in entries:
+            cid = competitor_repo.add(db, comp_id, station, name)
+            competitor_repo.update_station(db, cid, station, "A")
+            competitor_repo.update_weight(db, cid, weight)
+
+        service = SectorService()
+        service.calculate_sector_places(db, comp_id, "A")
+
+        competitors = competitor_repo.get_by_sector(db, comp_id, "A")
+        by_name = {c.full_name: c.sector_place for c in competitors}
+
+        assert by_name["FIRST"] == 1
+        assert by_name["TIE_A"] == 2
+        assert by_name["TIE_B"] == 2
+        assert by_name["FOURTH"] == 4  # skipped 3
+        assert by_name["ZERO"] == 5
+
+    def test_final_classification_with_tie(self, db):
+        """Two competitors with same sector_points and weight get same final place."""
+        venue_id = db.execute("SELECT id FROM venues WHERE name = 'Stawy Siedleckie'").fetchone()["id"]
+        cursor = db.execute(
+            "INSERT INTO competitions (venue_id, date, name) VALUES (?, ?, ?)",
+            (venue_id, "2026-01-02", "Final tie test"),
+        )
+        comp_id = cursor.lastrowid
+        db.commit()
+
+        # Sector A: two competitors with different weights
+        for station, name, weight in [(1, "A_FIRST", 10000), (2, "A_SECOND", 5000)]:
+            cid = competitor_repo.add(db, comp_id, station, name)
+            competitor_repo.update_station(db, cid, station, "A")
+            competitor_repo.update_weight(db, cid, weight)
+
+        # Sector B: two competitors, first has same weight as A_FIRST
+        for station, name, weight in [(6, "B_FIRST", 10000), (7, "B_SECOND", 5000)]:
+            cid = competitor_repo.add(db, comp_id, station, name)
+            competitor_repo.update_station(db, cid, station, "B")
+            competitor_repo.update_weight(db, cid, weight)
+
+        service = RankingService(SectorService())
+        service.calculate_all(db, comp_id, venue_id)
+
+        competitors = competitor_repo.get_all(db, comp_id)
+        by_name = {c.full_name: c for c in competitors}
+
+        # Both firsts have sector_points=1, weight=10000 -> same final place
+        assert by_name["A_FIRST"].final_place == 1
+        assert by_name["B_FIRST"].final_place == 1
+        # Both seconds have sector_points=2, weight=5000 -> same final place
+        assert by_name["A_SECOND"].final_place == 3  # skipped 2
+        assert by_name["B_SECOND"].final_place == 3
+
+    def test_three_way_tie_in_sector(self, db):
+        """Three competitors with same weight get same sector place."""
+        venue_id = db.execute("SELECT id FROM venues WHERE name = 'Stawy Siedleckie'").fetchone()["id"]
+        cursor = db.execute(
+            "INSERT INTO competitions (venue_id, date, name) VALUES (?, ?, ?)",
+            (venue_id, "2026-01-03", "Three-way tie"),
+        )
+        comp_id = cursor.lastrowid
+        db.commit()
+
+        entries = [
+            (1, "TIE_A", 8000),
+            (2, "TIE_B", 8000),
+            (3, "TIE_C", 8000),
+            (4, "FOURTH", 5000),
+        ]
+        for station, name, weight in entries:
+            cid = competitor_repo.add(db, comp_id, station, name)
+            competitor_repo.update_station(db, cid, station, "A")
+            competitor_repo.update_weight(db, cid, weight)
+
+        service = SectorService()
+        service.calculate_sector_places(db, comp_id, "A")
+
+        competitors = competitor_repo.get_by_sector(db, comp_id, "A")
+        by_name = {c.full_name: c.sector_place for c in competitors}
+
+        assert by_name["TIE_A"] == 1
+        assert by_name["TIE_B"] == 1
+        assert by_name["TIE_C"] == 1
+        assert by_name["FOURTH"] == 4
+
+    def test_multiple_ties_in_sector(self, db):
+        """Two independent ties in one sector."""
+        venue_id = db.execute("SELECT id FROM venues WHERE name = 'Stawy Siedleckie'").fetchone()["id"]
+        cursor = db.execute(
+            "INSERT INTO competitions (venue_id, date, name) VALUES (?, ?, ?)",
+            (venue_id, "2026-01-04", "Multiple ties"),
+        )
+        comp_id = cursor.lastrowid
+        db.commit()
+
+        entries = [
+            (1, "FIRST", 10000),
+            (2, "TIE_A1", 8000),
+            (3, "TIE_A2", 8000),
+            (4, "TIE_B1", 5000),
+            (5, "TIE_B2", 5000),
+            (46, "SIXTH", 3000),
+        ]
+        for station, name, weight in entries:
+            cid = competitor_repo.add(db, comp_id, station, name)
+            competitor_repo.update_station(db, cid, station, "A")
+            competitor_repo.update_weight(db, cid, weight)
+
+        service = SectorService()
+        service.calculate_sector_places(db, comp_id, "A")
+
+        competitors = competitor_repo.get_by_sector(db, comp_id, "A")
+        by_name = {c.full_name: c.sector_place for c in competitors}
+
+        assert by_name["FIRST"] == 1
+        assert by_name["TIE_A1"] == 2
+        assert by_name["TIE_A2"] == 2
+        assert by_name["TIE_B1"] == 4
+        assert by_name["TIE_B2"] == 4
+        assert by_name["SIXTH"] == 6
+
+    def test_tie_at_boundary_of_zero_weight(self, db):
+        """Tie just above zero-weight group gets correct places."""
+        venue_id = db.execute("SELECT id FROM venues WHERE name = 'Stawy Siedleckie'").fetchone()["id"]
+        cursor = db.execute(
+            "INSERT INTO competitions (venue_id, date, name) VALUES (?, ?, ?)",
+            (venue_id, "2026-01-05", "Tie at zero boundary"),
+        )
+        comp_id = cursor.lastrowid
+        db.commit()
+
+        entries = [
+            (1, "FIRST", 10000),
+            (2, "TIE_A", 5000),
+            (3, "TIE_B", 5000),
+            (4, "ZERO_A", 0),
+            (5, "ZERO_B", 0),
+        ]
+        for station, name, weight in entries:
+            cid = competitor_repo.add(db, comp_id, station, name)
+            competitor_repo.update_station(db, cid, station, "A")
+            competitor_repo.update_weight(db, cid, weight)
+
+        service = SectorService()
+        service.calculate_sector_places(db, comp_id, "A")
+
+        competitors = competitor_repo.get_by_sector(db, comp_id, "A")
+        by_name = {c.full_name: c.sector_place for c in competitors}
+
+        assert by_name["FIRST"] == 1
+        assert by_name["TIE_A"] == 2
+        assert by_name["TIE_B"] == 2
+        assert by_name["ZERO_A"] == 5
+        assert by_name["ZERO_B"] == 5
+
+    def test_get_winners_with_ex_aequo(self, db):
+        """With ex aequo in sector, get_winners returns correct results."""
+        venue_id = db.execute("SELECT id FROM venues WHERE name = 'Stawy Siedleckie'").fetchone()["id"]
+        cursor = db.execute(
+            "INSERT INTO competitions (venue_id, date, name) VALUES (?, ?, ?)",
+            (venue_id, "2026-01-06", "Winners ex aequo"),
+        )
+        comp_id = cursor.lastrowid
+        db.commit()
+
+        # Sector A: weights [10000, 10000, 5000] -> places 1, 1, 3
+        for station, name, weight in [(1, "A1", 10000), (2, "A2", 10000), (3, "A3", 5000)]:
+            cid = competitor_repo.add(db, comp_id, station, name)
+            competitor_repo.update_station(db, cid, station, "A")
+            competitor_repo.update_weight(db, cid, weight)
+
+        # Sector B: weights [9000, 8000, 7000] -> places 1, 2, 3
+        for station, name, weight in [(6, "B1", 9000), (7, "B2", 8000), (8, "B3", 7000)]:
+            cid = competitor_repo.add(db, comp_id, station, name)
+            competitor_repo.update_station(db, cid, station, "B")
+            competitor_repo.update_weight(db, cid, weight)
+
+        service = RankingService(SectorService())
+        service.calculate_all(db, comp_id, venue_id)
+
+        # winner_places=3: all 6 competitors qualify (all have sector_points <= 3)
+        winners = service.get_winners(db, comp_id, winner_places=3)
+        assert len(winners) == 6
+
+        # winner_places=1: A has two with pkt=1, B has one with pkt=1
+        winners = service.get_winners(db, comp_id, winner_places=1)
+        assert len(winners) == 3
+        winner_names = {w.full_name for w in winners}
+        assert winner_names == {"A1", "A2", "B1"}
+
+    def test_single_competitor_in_sector(self, db):
+        """Single competitor gets place 1 (or total if zero weight)."""
+        venue_id = db.execute("SELECT id FROM venues WHERE name = 'Stawy Siedleckie'").fetchone()["id"]
+
+        # Competition 1: single competitor with weight > 0
+        cursor = db.execute(
+            "INSERT INTO competitions (venue_id, date, name) VALUES (?, ?, ?)",
+            (venue_id, "2026-01-07", "Single with weight"),
+        )
+        comp_id1 = cursor.lastrowid
+        db.commit()
+
+        cid = competitor_repo.add(db, comp_id1, 1, "SOLO_WITH_WEIGHT")
+        competitor_repo.update_station(db, cid, 1, "A")
+        competitor_repo.update_weight(db, cid, 5000)
+
+        service = SectorService()
+        service.calculate_sector_places(db, comp_id1, "A")
+
+        competitors = competitor_repo.get_by_sector(db, comp_id1, "A")
+        assert competitors[0].sector_place == 1
+
+        # Competition 2: single competitor with weight = 0
+        cursor = db.execute(
+            "INSERT INTO competitions (venue_id, date, name) VALUES (?, ?, ?)",
+            (venue_id, "2026-01-08", "Single zero weight"),
+        )
+        comp_id2 = cursor.lastrowid
+        db.commit()
+
+        cid = competitor_repo.add(db, comp_id2, 1, "SOLO_ZERO")
+        competitor_repo.update_station(db, cid, 1, "A")
+        competitor_repo.update_weight(db, cid, 0)
+
+        service.calculate_sector_places(db, comp_id2, "A")
+
+        competitors = competitor_repo.get_by_sector(db, comp_id2, "A")
+        assert competitors[0].sector_place == 1  # total = 1

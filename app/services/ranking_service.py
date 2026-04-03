@@ -22,7 +22,10 @@ class RankingService:
 
         with_weight.sort(key=lambda c: (c.sector_points, -c.weight_grams))
 
-        for place, c in enumerate(with_weight, start=1):
+        place = 0
+        for i, c in enumerate(with_weight):
+            if i == 0 or (c.sector_points, c.weight_grams) != (with_weight[i - 1].sector_points, with_weight[i - 1].weight_grams):
+                place = i + 1
             competitor_repo.update_rankings(conn, c.id, c.sector_place, c.sector_points, place)
 
         for c in zero_weight:
