@@ -12,17 +12,18 @@ echo Instalowanie zaleznosci...
 
 echo Budowanie...
 .venv\Scripts\pyinstaller ^
-    --onefile ^
+    --onedir ^
     --windowed ^
+    --noupx ^
     --name=FeederComp ^
     --add-data "seed_data;seed_data" ^
     --collect-all customtkinter ^
     app\main.py
 
 echo.
-if exist dist\FeederComp.exe (
-    echo GOTOWE! Plik: dist\FeederComp.exe
-    echo Skopiuj go na pulpit i kliknij dwukrotnie.
+if exist dist\FeederComp\FeederComp.exe (
+    echo GOTOWE! Folder: dist\FeederComp\
+    echo Skopiuj caly folder na pendrive lub pulpit.
 ) else (
     echo BLAD: Budowanie nie powiodlo sie.
 )
