@@ -116,6 +116,26 @@ def search_by_name(conn: sqlite3.Connection, competition_id: int, query: str) ->
     return [_row_to_competitor(row) for row in rows]
 
 
+def set_all_present(conn: sqlite3.Connection, competition_id: int, limit: int | None = None) -> None:
+    if limit is not None:
+        conn.execute(
+            "UPDATE competitors SET is_present = 1 WHERE id IN ("
+            "SELECT id FROM competitors WHERE competition_id = ? ORDER BY list_number LIMIT ?)",
+            (competition_id, limit),
+        )
+    else:
+        conn.execute("UPDATE competitors SET is_present = 1 WHERE competition_id = ?", (competition_id,))
+    conn.commit()
+
+
+def update_details(conn: sqlite3.Connection, competitor_id: int, phone: str | None, payment_status: str) -> None:
+    conn.execute(
+        "UPDATE competitors SET phone = ?, payment_status = ? WHERE id = ?",
+        (phone, payment_status, competitor_id),
+    )
+    conn.commit()
+
+
 def delete(conn: sqlite3.Connection, competitor_id: int) -> None:
     conn.execute("DELETE FROM competitors WHERE id = ?", (competitor_id,))
     conn.commit()

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from tkinter import messagebox
 
 import customtkinter as ctk
@@ -60,7 +60,14 @@ class StartScreen(ctk.CTkFrame):
 
         ctk.CTkLabel(frame, text="Nazwa zawod\u00f3w:", font=("Segoe UI", 14)).pack(padx=15, anchor="w")
         self.name_entry = ctk.CTkEntry(frame, width=280)
-        self.name_entry.pack(padx=15, pady=(0, 15))
+        self.name_entry.pack(padx=15, pady=(0, 8))
+
+        limits_row = ctk.CTkFrame(frame)
+        limits_row.pack(fill="x", padx=15, pady=(0, 15))
+        ctk.CTkLabel(limits_row, text="Miejsc nagrodzonych:", font=("Segoe UI", 14)).pack(side="left")
+        self.winner_places_entry = ctk.CTkEntry(limits_row, width=60)
+        self.winner_places_entry.insert(0, "3")
+        self.winner_places_entry.pack(side="left", padx=(2, 0))
 
         ctk.CTkButton(frame, text="Utw\u00f3rz", command=self._create_competition, width=200).pack(pady=(0, 20))
 
@@ -119,7 +126,20 @@ class StartScreen(ctk.CTkFrame):
 
         comp_date = self.date_entry.get().strip()
         if not comp_date:
-            messagebox.showwarning("B\u0142\u0105d", "Podaj dat\u0119.")
+            messagebox.showwarning("Błąd", "Podaj datę.")
+            return
+        try:
+            datetime.strptime(comp_date, "%Y-%m-%d")
+        except ValueError:
+            messagebox.showwarning("Błąd", "Nieprawidłowy format daty. Użyj RRRR-MM-DD.")
+            return
+
+        try:
+            winner_places = int(self.winner_places_entry.get().strip())
+            if winner_places < 1:
+                raise ValueError
+        except ValueError:
+            messagebox.showwarning("B\u0142\u0105d", "Miejsc nagrodzonych musi by\u0107 liczb\u0105 dodatni\u0105.")
             return
 
         comp_name = self.name_entry.get().strip() or None
@@ -127,7 +147,10 @@ class StartScreen(ctk.CTkFrame):
 
         conn = self.app.get_connection()
         try:
-            comp_id = competition_repo.create(conn, venue.id, comp_date, comp_name)
+            comp_id = competition_repo.create(
+                conn, venue.id, comp_date, comp_name,
+                max_competitors=venue.total_stations, winner_places=winner_places,
+            )
         finally:
             conn.close()
 

@@ -44,6 +44,15 @@ CREATE TABLE IF NOT EXISTS competitors (
     UNIQUE(competition_id, list_number),
     UNIQUE(competition_id, station_number)
 );
+
+CREATE TABLE IF NOT EXISTS excluded_stations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    competition_id INTEGER NOT NULL REFERENCES competitions(id) ON DELETE CASCADE,
+    venue_id INTEGER NOT NULL REFERENCES venues(id),
+    station_number INTEGER NOT NULL,
+    sector_name TEXT NOT NULL,
+    UNIQUE(competition_id, station_number)
+);
 """
 
 from app.config import get_bundle_dir
