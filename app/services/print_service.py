@@ -146,7 +146,7 @@ class PrintService:
         with_place = sorted([c for c in competitors if c.final_place is not None], key=lambda c: c.final_place)
         without_place = sorted(
             [c for c in competitors if c.final_place is None],
-            key=lambda c: (c.sector_name is None, c.sector_name or "", c.list_number),
+            key=lambda c: (c.sector_name, c.list_number),
         )
 
         for c in with_place + without_place:

@@ -132,7 +132,7 @@ class ResultsScreen(ctk.CTkFrame):
         with_place = [c for c in competitors if c.final_place is not None]
         without_place = [c for c in competitors if c.final_place is None]
         with_place.sort(key=lambda c: c.final_place)
-        without_place.sort(key=lambda c: (c.sector_name is None, c.sector_name or "", c.list_number))
+        without_place.sort(key=lambda c: (c.sector_name, c.list_number))
 
         for i, c in enumerate(with_place + without_place):
             tag = "even" if i % 2 == 0 else "odd"
