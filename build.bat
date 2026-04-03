@@ -16,8 +16,10 @@ echo Budowanie...
     --windowed ^
     --noupx ^
     --name=FeederComp ^
+    --icon=assets/feederland-favicon.ico ^
     --add-data "seed_data;seed_data" ^
     --add-data "app/themes;app/themes" ^
+    --add-data "assets;assets" ^
     --collect-all customtkinter ^
     app\main.py
 

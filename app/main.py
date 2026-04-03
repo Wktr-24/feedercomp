@@ -21,6 +21,10 @@ def main():
     root.geometry("1100x700")
     root.minsize(900, 600)
 
+    icon_path = get_bundle_dir() / "assets" / "feederland-favicon.ico"
+    if icon_path.exists():
+        root.iconbitmap(str(icon_path))
+
     app = AppWindow(root, db_path)
     app.pack(fill="both", expand=True)
 
