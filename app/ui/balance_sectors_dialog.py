@@ -9,6 +9,8 @@ from app.services.sector_service import SectorService
 class BalanceSectorsDialog(ctk.CTkToplevel):
     def __init__(self, master, app, competition_id, venue_id, on_confirm=None):
         super().__init__(master)
+        self.withdraw()
+
         self.app = app
         self.competition_id = competition_id
         self.venue_id = venue_id
@@ -29,7 +31,8 @@ class BalanceSectorsDialog(ctk.CTkToplevel):
             conn.close()
 
         self.transient(master)
-        self.wait_visibility()
+        self.update_idletasks()
+        self.deiconify()
         self.grab_set()
         self.focus_set()
 
@@ -112,12 +115,14 @@ class BalanceSectorsDialog(ctk.CTkToplevel):
 
                 if is_assigned:
                     btn.configure(
-                        fg_color="#5cb85c",
-                        hover_color="#5cb85c",
+                        fg_color="#3D8B3D",
+                        hover_color="#3D8B3D",
+                        text_color="#FFFFFF",
+                        text_color_disabled="#FFFFFF",
                         state="disabled",
                     )
                 elif is_selected:
-                    btn.configure(fg_color="#d9534f", hover_color="#c9302c")
+                    btn.configure(fg_color="#922B21", hover_color="#7B241C", text_color="#FFFFFF")
 
         self.counter_label = ctk.CTkLabel(
             self,
@@ -131,6 +136,7 @@ class BalanceSectorsDialog(ctk.CTkToplevel):
 
         self.confirm_btn = ctk.CTkButton(
             btn_frame, text="Zatwierdź", command=self._on_confirm, width=120,
+            text_color_disabled="#555555",
         )
         self.confirm_btn.pack(side="left", padx=10)
         self._update_confirm_state()
@@ -157,7 +163,7 @@ class BalanceSectorsDialog(ctk.CTkToplevel):
             if len(self.selected_stations) >= self.total_to_exclude:
                 return
             self.selected_stations.add(key)
-            btn.configure(fg_color="#d9534f", hover_color="#c9302c")
+            btn.configure(fg_color="#922B21", hover_color="#7B241C", text_color="#FFFFFF")
         self.counter_label.configure(text=self._counter_text())
         self._update_sector_label(key[0])
         self._update_confirm_state()

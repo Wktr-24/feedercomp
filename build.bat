@@ -17,6 +17,7 @@ echo Budowanie...
     --noupx ^
     --name=FeederComp ^
     --add-data "seed_data;seed_data" ^
+    --add-data "app/themes;app/themes" ^
     --collect-all customtkinter ^
     app\main.py
 

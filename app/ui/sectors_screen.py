@@ -5,7 +5,7 @@ import customtkinter as ctk
 from app.repositories import competitor_repo, venue_repo
 from app.services.ranking_service import RankingService
 from app.services.sector_service import SectorService
-from app.utils import configure_treeview_style, format_weight_kg
+from app.utils import configure_treeview_style, format_weight_kg, get_treeview_tag_colors
 
 
 class SectorsScreen(ctk.CTkFrame):
@@ -71,7 +71,7 @@ class SectorsScreen(ctk.CTkFrame):
         widths = (80, 250, 80, 100, 80)
         anchors = ("center", "w", "center", "center", "center")
 
-        configure_treeview_style()
+        configure_treeview_style(dark_mode=self.app.dark_mode)
 
         tree = ttk.Treeview(parent, columns=columns, show="headings", selectmode="browse")
         for col, heading, width, anchor in zip(columns, headings, widths, anchors):
@@ -84,12 +84,19 @@ class SectorsScreen(ctk.CTkFrame):
         tree.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        tree.tag_configure("even", background="#f0f0f0")
-        tree.tag_configure("odd", background="#ffffff")
+        colors = get_treeview_tag_colors(self.app.dark_mode)
+        tree.tag_configure("even", background=colors["even"])
+        tree.tag_configure("odd", background=colors["odd"])
 
         tree.bind("<ButtonRelease-1>", self._on_row_click)
         tree.bind("<Double-1>", self._on_row_double_click)
         return tree
+
+    def _apply_tag_colors(self):
+        colors = get_treeview_tag_colors(self.app.dark_mode)
+        for tree in self.tables.values():
+            tree.tag_configure("even", background=colors["even"])
+            tree.tag_configure("odd", background=colors["odd"])
 
     # -- Bottom: action buttons --
 

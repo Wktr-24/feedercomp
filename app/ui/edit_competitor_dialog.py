@@ -10,6 +10,8 @@ from app.services.sector_service import SectorService
 class EditCompetitorDialog(ctk.CTkToplevel):
     def __init__(self, master, app, competitor, on_save=None):
         super().__init__(master)
+        self.withdraw()
+
         self.app = app
         self.competitor = competitor
         self.on_save = on_save
@@ -26,7 +28,8 @@ class EditCompetitorDialog(ctk.CTkToplevel):
         self._build_ui()
 
         self.transient(master)
-        self.wait_visibility()
+        self.update_idletasks()
+        self.deiconify()
         self.grab_set()
         self.focus_set()
 

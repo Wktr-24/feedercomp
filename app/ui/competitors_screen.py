@@ -6,7 +6,7 @@ import customtkinter as ctk
 from app.constants import PAYMENT_DISPLAY, PAYMENT_LABELS, PAYMENT_VALUES
 from app.repositories import competitor_repo, competition_repo
 from app.services.sector_service import SectorService
-from app.utils import configure_treeview_style
+from app.utils import configure_treeview_style, get_treeview_tag_colors
 
 _COLUMNS = ("nr", "name", "phone", "payment", "present", "station", "sector")
 _HEADINGS = ("Nr", "Imi\u0119 i Nazwisko", "Telefon", "Op\u0142ata", "Obecny", "Stanowisko", "Sektor")
@@ -87,7 +87,7 @@ class CompetitorsScreen(ctk.CTkFrame):
         table_frame = ctk.CTkFrame(self)
         table_frame.pack(fill="both", expand=True, padx=5, pady=2)
 
-        configure_treeview_style()
+        configure_treeview_style(dark_mode=self.app.dark_mode)
 
         self.tree = ttk.Treeview(
             table_frame,
@@ -107,11 +107,15 @@ class CompetitorsScreen(ctk.CTkFrame):
         self.tree.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        self.tree.tag_configure("even", background="#f0f0f0")
-        self.tree.tag_configure("odd", background="#ffffff")
-        self.tree.tag_configure("reserve", background="#fff3cd")
+        self._apply_tag_colors()
 
         self.tree.bind("<Double-1>", self._on_double_click)
+
+    def _apply_tag_colors(self):
+        colors = get_treeview_tag_colors(self.app.dark_mode)
+        self.tree.tag_configure("even", background=colors["even"])
+        self.tree.tag_configure("odd", background=colors["odd"])
+        self.tree.tag_configure("reserve", background=colors["reserve"])
 
     # -- Actions --
 
@@ -140,7 +144,7 @@ class CompetitorsScreen(ctk.CTkFrame):
 
         ctk.CTkButton(
             actions, text="Usu\u0144 zaznaczonego", command=self._delete_selected, width=150,
-            fg_color="#d9534f", hover_color="#c9302c",
+            fg_color="#922B21", hover_color="#7B241C", text_color="#FFFFFF",
         ).pack(side="right", padx=10)
 
     # -- Data operations --

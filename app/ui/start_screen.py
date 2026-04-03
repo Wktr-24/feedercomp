@@ -98,7 +98,7 @@ class StartScreen(ctk.CTkFrame):
                 self.competitions_frame,
                 text="Brak zapisanych zawod\u00f3w",
                 font=("Segoe UI", 13),
-                text_color="gray",
+                text_color=["gray40", "gray60"],
             ).pack(pady=20)
             return
 
@@ -112,7 +112,7 @@ class StartScreen(ctk.CTkFrame):
 
             del_btn = ctk.CTkButton(
                 row, text="Usuń", width=60,
-                fg_color="#d9534f", hover_color="#c9302c",
+                fg_color="#922B21", hover_color="#7B241C", text_color="#FFFFFF",
                 command=lambda c=comp: self._delete_competition(c),
             )
             del_btn.pack(side="right", padx=2, pady=2)

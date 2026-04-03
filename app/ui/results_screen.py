@@ -7,7 +7,7 @@ from app.repositories import competitor_repo, competition_repo, venue_repo
 from app.services.print_service import PrintService
 from app.services.ranking_service import RankingService
 from app.services.sector_service import SectorService
-from app.utils import configure_treeview_style, format_weight_kg
+from app.utils import configure_treeview_style, format_weight_kg, get_treeview_tag_colors
 
 
 class ResultsScreen(ctk.CTkFrame):
@@ -39,7 +39,7 @@ class ResultsScreen(ctk.CTkFrame):
         widths = (60, 250, 60, 80, 80, 100)
         anchors = ("center", "w", "center", "center", "center", "center")
 
-        configure_treeview_style()
+        configure_treeview_style(dark_mode=self.app.dark_mode)
 
         self.class_tree = ttk.Treeview(tab, columns=columns, show="headings", selectmode="browse")
         for col, heading, width, anchor in zip(columns, headings, widths, anchors):
@@ -52,8 +52,9 @@ class ResultsScreen(ctk.CTkFrame):
         self.class_tree.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        self.class_tree.tag_configure("even", background="#f0f0f0")
-        self.class_tree.tag_configure("odd", background="#ffffff")
+        colors = get_treeview_tag_colors(self.app.dark_mode)
+        self.class_tree.tag_configure("even", background=colors["even"])
+        self.class_tree.tag_configure("odd", background=colors["odd"])
 
     def _build_winners_tab(self):
         tab = self.tabview.add("Lista zwycięzców")
@@ -74,8 +75,16 @@ class ResultsScreen(ctk.CTkFrame):
         self.winners_tree.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        self.winners_tree.tag_configure("even", background="#f0f0f0")
-        self.winners_tree.tag_configure("odd", background="#ffffff")
+        colors = get_treeview_tag_colors(self.app.dark_mode)
+        self.winners_tree.tag_configure("even", background=colors["even"])
+        self.winners_tree.tag_configure("odd", background=colors["odd"])
+
+    def _apply_tag_colors(self):
+        colors = get_treeview_tag_colors(self.app.dark_mode)
+        self.class_tree.tag_configure("even", background=colors["even"])
+        self.class_tree.tag_configure("odd", background=colors["odd"])
+        self.winners_tree.tag_configure("even", background=colors["even"])
+        self.winners_tree.tag_configure("odd", background=colors["odd"])
 
     # -- Bottom: action buttons --
 
