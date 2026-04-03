@@ -33,6 +33,10 @@ class SectorsScreen(ctk.CTkFrame):
         self.search_entry.pack(side="left", padx=2)
         self.search_entry.bind("<KeyRelease>", self._on_search_key)
         self.search_entry.bind("<Return>", lambda _: self._jump_to_next())
+        ctk.CTkButton(
+            top, text="✕", width=30, height=28,
+            command=self._clear_search,
+        ).pack(side="left", padx=2)
         self.search_counter = ctk.CTkLabel(top, text="", font=("Segoe UI", 12), width=60)
         self.search_counter.pack(side="left", padx=(2, 5))
 
@@ -147,6 +151,12 @@ class SectorsScreen(ctk.CTkFrame):
         self.weight_entry.insert(0, str(weight_g))
         self.weight_entry.focus_set()
         self.weight_entry.select_range(0, "end")
+
+    def _clear_search(self):
+        self.search_entry.delete(0, "end")
+        self._search_matches = []
+        self._search_index = 0
+        self.search_counter.configure(text="")
 
     def _on_search_key(self, event):
         if event.keysym == "Return":

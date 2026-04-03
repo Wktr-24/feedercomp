@@ -34,7 +34,7 @@ class ResultsScreen(ctk.CTkFrame):
         tab = self.tabview.add("Klasyfikacja końcowa")
 
         columns = ("place", "name", "sector", "points", "weight_g", "weight_kg")
-        headings = ("Miejsce", "Nazwisko", "Sektor", "Pkt sekt.", "Waga (g)", "Waga (kg)")
+        headings = ("Miejsce", "Imię i Nazwisko", "Sektor", "Pkt sekt.", "Waga (g)", "Waga (kg)")
         widths = (60, 250, 60, 80, 80, 100)
         anchors = ("center", "w", "center", "center", "center", "center")
 
@@ -60,7 +60,7 @@ class ResultsScreen(ctk.CTkFrame):
         tab = self.tabview.add("Lista zwycięzców")
 
         columns = ("place", "name", "weight_g", "weight_kg")
-        headings = ("Miejsce", "Nazwisko", "Waga (g)", "Waga (kg)")
+        headings = ("Miejsce", "Imię i Nazwisko", "Waga (g)", "Waga (kg)")
         widths = (60, 300, 100, 120)
         anchors = ("center", "w", "center", "center")
 
@@ -123,6 +123,7 @@ class ResultsScreen(ctk.CTkFrame):
         with_place = [c for c in competitors if c.final_place is not None]
         without_place = [c for c in competitors if c.final_place is None]
         with_place.sort(key=lambda c: c.final_place)
+        without_place.sort(key=lambda c: (c.sector_name is None, c.sector_name or "", c.list_number))
 
         for i, c in enumerate(with_place + without_place):
             tag = "even" if i % 2 == 0 else "odd"

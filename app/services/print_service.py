@@ -135,11 +135,14 @@ class PrintService:
         elements.append(Paragraph("KLASYFIKACJA KOŃCOWA", title))
         elements.append(Spacer(1, 3*mm))
 
-        data = [['MIEJSCE', 'NAZWISKO', 'SEKTOR', 'PKT SEKT.', 'WAGA (kg)']]
+        data = [['MIEJSCE', 'IMIĘ I NAZWISKO', 'SEKTOR', 'PKT SEKT.', 'WAGA (kg)']]
         competitors = competitor_repo.get_all(conn, competition_id)
 
         with_place = sorted([c for c in competitors if c.final_place is not None], key=lambda c: c.final_place)
-        without_place = [c for c in competitors if c.final_place is None]
+        without_place = sorted(
+            [c for c in competitors if c.final_place is None],
+            key=lambda c: (c.sector_name is None, c.sector_name or "", c.list_number),
+        )
 
         for c in with_place + without_place:
             place = str(c.final_place) if c.final_place is not None else "-"
@@ -180,7 +183,7 @@ class PrintService:
         service = RankingService(SectorService())
         winners = service.get_winners(conn, competition_id, winner_places)
 
-        data = [['MIEJSCE', 'NAZWISKO', 'WAGA (kg)']]
+        data = [['MIEJSCE', 'IMIĘ I NAZWISKO', 'WAGA (kg)']]
         for c in winners:
             data.append([
                 str(c.final_place) if c.final_place is not None else "-",
