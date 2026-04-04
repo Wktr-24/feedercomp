@@ -59,6 +59,17 @@ class ResultsScreen(ctk.CTkFrame):
     def _build_winners_tab(self):
         tab = self.tabview.add("Lista zwycięzców")
 
+        control_frame = ctk.CTkFrame(tab)
+        control_frame.pack(fill="x", padx=5, pady=(5, 5))
+        ctk.CTkLabel(control_frame, text="Liczba miejsc nagradzanych:", font=("Segoe UI", 13)).pack(side="left", padx=(5, 5))
+        self.winner_places_entry = ctk.CTkEntry(control_frame, width=60)
+        self.winner_places_entry.pack(side="left", padx=(0, 5))
+        self.winner_places_entry.bind("<Return>", lambda e: self._on_apply_winner_places())
+        ctk.CTkButton(
+            control_frame, text="Zastosuj", width=90,
+            command=self._on_apply_winner_places,
+        ).pack(side="left")
+
         columns = ("place", "name", "weight_g", "weight_kg")
         headings = ("Miejsce", "Imię i Nazwisko", "Waga (g)", "Waga (kg)")
         widths = (60, 300, 100, 120)
@@ -151,6 +162,9 @@ class ResultsScreen(ctk.CTkFrame):
         comp = competition_repo.get_by_id(conn, self.app.competition_id)
         winner_places = comp.winner_places if comp else 3
 
+        self.winner_places_entry.delete(0, "end")
+        self.winner_places_entry.insert(0, str(winner_places))
+
         service = RankingService(SectorService())
         winners = service.get_winners(conn, self.app.competition_id, winner_places)
 
@@ -162,6 +176,32 @@ class ResultsScreen(ctk.CTkFrame):
                 c.weight_grams,
                 format_weight_kg(c.weight_grams),
             ))
+
+    def _sync_winner_places_from_entry(self, conn) -> bool:
+        """Save entry value to DB if it differs. Returns True on success, False if invalid."""
+        entry_text = self.winner_places_entry.get().strip()
+        try:
+            new_value = int(entry_text)
+        except ValueError:
+            messagebox.showerror("Błąd", "Liczba miejsc nagradzanych musi być liczbą całkowitą")
+            return False
+        if new_value < 1:
+            messagebox.showerror("Błąd", "Liczba miejsc nagradzanych musi być co najmniej 1")
+            return False
+
+        comp = competition_repo.get_by_id(conn, self.app.competition_id)
+        if comp and comp.winner_places != new_value:
+            competition_repo.update_winner_places(conn, self.app.competition_id, new_value)
+            conn.commit()
+        return True
+
+    def _on_apply_winner_places(self):
+        conn = self.app.get_connection()
+        try:
+            if self._sync_winner_places_from_entry(conn):
+                self._refresh_winners(conn)
+        finally:
+            conn.close()
 
     def _get_comp_and_venue(self, conn):
         comp = competition_repo.get_by_id(conn, self.app.competition_id)

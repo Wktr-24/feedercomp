@@ -1,4 +1,4 @@
-from app.repositories import competitor_repo
+from app.repositories import competition_repo, competitor_repo
 from app.services.ranking_service import RankingService
 from app.services.sector_service import SectorService
 
@@ -546,3 +546,25 @@ class TestExAequo:
 
         competitors = competitor_repo.get_by_sector(db, comp_id2, "A")
         assert competitors[0].sector_place == 1  # total = 1
+
+
+class TestUpdateWinnerPlaces:
+    def test_update_winner_places_persists_and_affects_get_winners(self, db):
+        competition_id, venue_id = _setup_competition(db)
+        service = RankingService(SectorService())
+        service.calculate_all(db, competition_id, venue_id)
+
+        comp = competition_repo.get_by_id(db, competition_id)
+        assert comp.winner_places == 3
+
+        competition_repo.update_winner_places(db, competition_id, 2)
+        db.commit()
+
+        comp = competition_repo.get_by_id(db, competition_id)
+        assert comp.winner_places == 2
+
+        winners = service.get_winners(db, competition_id, comp.winner_places)
+        assert len(winners) == 10
+        winner_names = [w.full_name for w in winners]
+        expected_winner_names = [name for _, name, _, _, _ in EXPECTED_FINAL_CLASSIFICATION[:10]]
+        assert winner_names == expected_winner_names
