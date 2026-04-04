@@ -14,6 +14,7 @@ def main():
     ctk.set_appearance_mode("dark")
 
     root = ctk.CTk()
+    root.tk.eval('encoding system utf-8')
 
     from tkinter import ttk
     ttk.Style().theme_use("clam")
