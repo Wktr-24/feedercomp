@@ -20,7 +20,7 @@ class BalanceSectorsDialog(ctk.CTkToplevel):
         self.station_buttons: dict[tuple[str, int], ctk.CTkButton] = {}
 
         self.title("Wyrównanie sektorów")
-        self.geometry("700x550")
+        self.geometry("1100x500")
         self.resizable(False, False)
 
         conn = self.app.get_connection()
@@ -64,6 +64,8 @@ class BalanceSectorsDialog(ctk.CTkToplevel):
 
     def _build_ui(self):
         self.sector_labels: dict[str, ctk.CTkLabel] = {}
+        half = self.total_stations // 2
+        sectors_lr = list(reversed(self.sector_info))
 
         header = ctk.CTkLabel(
             self,
@@ -74,56 +76,60 @@ class BalanceSectorsDialog(ctk.CTkToplevel):
         )
         header.pack(padx=10, pady=(10, 5))
 
-        scroll_frame = ctk.CTkScrollableFrame(self, width=660, height=370)
-        scroll_frame.pack(padx=10, pady=5, fill="both", expand=True)
+        # --- top bank ---
+        top_frame = ctk.CTkFrame(self, fg_color="transparent")
+        top_frame.pack(padx=10, pady=(5, 0))
 
-        for sector in self.sector_info:
-            sector_frame = ctk.CTkFrame(scroll_frame)
-            sector_frame.pack(fill="x", padx=5, pady=4)
+        for idx, sector in enumerate(sectors_lr):
+            sector_top_frame = ctk.CTkFrame(top_frame, fg_color="transparent")
+            sector_top_frame.pack(side="left", padx=(0 if idx == 0 else 6, 0))
+            top_stations = sorted(
+                [s for s in sector["stations"] if s <= half], reverse=True,
+            )
+            for station in top_stations:
+                key = (sector["name"], station)
+                btn = self._create_station_button(sector_top_frame, key)
+                btn.pack(side="left", padx=2, pady=2)
 
+        # --- pond rectangle ---
+        pond_frame = ctk.CTkFrame(self, fg_color="#1a5276", height=80)
+        pond_frame.pack(fill="x", padx=10, pady=0)
+        pond_frame.pack_propagate(False)
+
+        for idx, sector in enumerate(sectors_lr):
+            if idx > 0:
+                sep = ctk.CTkFrame(pond_frame, width=2, fg_color="#E74C3C")
+                sep.pack(side="left", fill="y")
             sector_excluded = sum(
                 1 for s in sector["stations"]
                 if (sector["name"], s) in self.selected_stations
             )
             effective = len(sector["stations"]) - sector_excluded
-            label_text = f"Sektor {sector['name']} ({effective}/{len(sector['stations'])} stanowisk):"
             lbl = ctk.CTkLabel(
-                sector_frame, text=label_text,
-                font=("Segoe UI", 13, "bold"),
+                pond_frame,
+                text=f"Sektor {sector['name']}\n({effective}/{len(sector['stations'])})",
+                font=("Segoe UI", 14, "bold"),
+                text_color="#FFFFFF",
             )
-            lbl.pack(anchor="w", padx=8, pady=(4, 2))
+            lbl.pack(side="left", expand=True, fill="both")
             self.sector_labels[sector["name"]] = lbl
 
-            buttons_frame = ctk.CTkFrame(sector_frame, fg_color="transparent")
-            buttons_frame.pack(fill="x", padx=8, pady=(0, 4))
+        # --- bottom bank ---
+        bottom_frame = ctk.CTkFrame(self, fg_color="transparent")
+        bottom_frame.pack(padx=10, pady=(0, 5))
 
-            for station in sector["stations"]:
+        for idx, sector in enumerate(sectors_lr):
+            sector_bot_frame = ctk.CTkFrame(bottom_frame, fg_color="transparent")
+            sector_bot_frame.pack(side="left", padx=(0 if idx == 0 else 6, 0))
+            bot_stations = sorted(
+                [s for s in sector["stations"] if s > half],
+            )
+            for station in bot_stations:
                 key = (sector["name"], station)
-                is_selected = key in self.selected_stations
-                is_assigned = station in self.assigned_stations
-
-                btn = ctk.CTkButton(
-                    buttons_frame,
-                    text=str(station),
-                    width=45,
-                    height=30,
-                    font=("Segoe UI", 12),
-                    command=lambda k=key: self._toggle_station(k),
-                )
+                btn = self._create_station_button(sector_bot_frame, key)
                 btn.pack(side="left", padx=2, pady=2)
-                self.station_buttons[key] = btn
 
-                if is_assigned:
-                    btn.configure(
-                        fg_color="#3D8B3D",
-                        hover_color="#3D8B3D",
-                        text_color="#FFFFFF",
-                        text_color_disabled="#FFFFFF",
-                        state="disabled",
-                    )
-                elif is_selected:
-                    btn.configure(fg_color="#922B21", hover_color="#7B241C", text_color="#FFFFFF")
-
+        # --- counter and action buttons ---
         self.counter_label = ctk.CTkLabel(
             self,
             text=self._counter_text(),
@@ -150,6 +156,34 @@ class BalanceSectorsDialog(ctk.CTkToplevel):
                 btn_frame, text="Przywróć wszystkie", command=self._restore_all, width=160,
             ).pack(side="right", padx=10)
 
+    def _create_station_button(self, parent, key: tuple[str, int]) -> ctk.CTkButton:
+        _, station = key
+        is_selected = key in self.selected_stations
+        is_assigned = station in self.assigned_stations
+
+        btn = ctk.CTkButton(
+            parent,
+            text=str(station),
+            width=38,
+            height=30,
+            font=("Segoe UI", 12),
+            command=lambda k=key: self._toggle_station(k),
+        )
+        self.station_buttons[key] = btn
+
+        if is_assigned:
+            btn.configure(
+                fg_color="#3D8B3D",
+                hover_color="#3D8B3D",
+                text_color="#FFFFFF",
+                text_color_disabled="#FFFFFF",
+                state="disabled",
+            )
+        elif is_selected:
+            btn.configure(fg_color="#922B21", hover_color="#7B241C", text_color="#FFFFFF")
+
+        return btn
+
     def _toggle_station(self, key: tuple[str, int]):
         _, station_number = key
         if station_number in self.assigned_stations:
@@ -175,7 +209,7 @@ class BalanceSectorsDialog(ctk.CTkToplevel):
         )
         effective = len(sector["stations"]) - excluded_count
         self.sector_labels[sector_name].configure(
-            text=f"Sektor {sector_name} ({effective}/{len(sector['stations'])} stanowisk):"
+            text=f"Sektor {sector_name}\n({effective}/{len(sector['stations'])})"
         )
 
     def _update_confirm_state(self):
