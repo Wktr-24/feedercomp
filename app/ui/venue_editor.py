@@ -3,6 +3,7 @@ from tkinter import messagebox
 import customtkinter as ctk
 
 from app.repositories import venue_repo
+from app.utils import normalize_whitespace
 
 
 class VenueEditor(ctk.CTkFrame):
@@ -69,7 +70,7 @@ class VenueEditor(ctk.CTkFrame):
                     messagebox.showerror("Błąd", f"Nieprawidłowe numery stanowisk w sektorze {name}")
                     return
 
-        new_name = self.new_sector_name.get().strip().upper()
+        new_name = normalize_whitespace(self.new_sector_name.get()).upper()
         new_stations_text = self.new_sector_stations.get().strip()
         if new_name and new_stations_text:
             try:

@@ -1,3 +1,16 @@
+import re
+
+
+def normalize_whitespace(text: str) -> str:
+    """Collapse multiple whitespace to single space and strip edges.
+
+    Examples:
+        "  Liga   Karpiowa  " -> "Liga Karpiowa"
+        "Jan\tKowalski" -> "Jan Kowalski"
+    """
+    return re.sub(r'\s+', ' ', text).strip()
+
+
 def format_weight_kg(grams: int) -> str:
     if grams == 0:
         return "0"

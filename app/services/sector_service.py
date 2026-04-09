@@ -17,7 +17,6 @@ class SectorService:
         if competition_id is not None and excluded_station_repo.is_excluded(conn, competition_id, station_number):
             raise ValueError(f"Stanowisko {station_number} jest wykluczone z losowania.")
         competitor_repo.update_station(conn, competitor_id, station_number, sector_name)
-        conn.commit()
 
     def calculate_sector_places(self, conn: sqlite3.Connection, competition_id: int, sector_name: str):
         competitors = competitor_repo.get_by_sector(conn, competition_id, sector_name)

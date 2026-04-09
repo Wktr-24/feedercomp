@@ -4,6 +4,7 @@ from tkinter import messagebox
 import customtkinter as ctk
 
 from app.repositories import venue_repo, competition_repo
+from app.utils import normalize_whitespace
 
 
 class StartScreen(ctk.CTkFrame):
@@ -149,7 +150,7 @@ class StartScreen(ctk.CTkFrame):
             messagebox.showwarning("B\u0142\u0105d", "Miejsc nagrodzonych musi by\u0107 liczb\u0105 dodatni\u0105.")
             return
 
-        comp_name = self.name_entry.get().strip() or None
+        comp_name = normalize_whitespace(self.name_entry.get()) or None
         venue = self.venue_map[venue_name]
 
         conn = self.app.get_connection()

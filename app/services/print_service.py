@@ -1,6 +1,7 @@
 import os
 import tempfile
 from pathlib import Path
+from xml.sax.saxutils import escape
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
@@ -60,9 +61,9 @@ class PrintService:
 
         date_text = f"ZAWODY {display_date}"
         if comp_name:
-            date_text = f"{comp_name} — {display_date}"
+            date_text = f"{escape(comp_name)} — {display_date}"
         elements.append(Paragraph(date_text, subtitle_style))
-        elements.append(Paragraph(f"Łowisko {venue_name.upper()}", subtitle_style))
+        elements.append(Paragraph(f"Łowisko {escape(venue_name.upper())}", subtitle_style))
         elements.append(Spacer(1, 5*mm))
 
         return elements

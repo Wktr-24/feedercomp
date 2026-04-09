@@ -7,13 +7,20 @@ from app.repositories import competitor_repo, competition_repo, venue_repo
 from app.services.print_service import PrintService
 from app.services.ranking_service import RankingService
 from app.services.sector_service import SectorService
-from app.utils import configure_treeview_style, format_weight_kg, get_treeview_tag_colors
+from app.utils import (
+    configure_treeview_style,
+    format_weight_kg,
+    get_treeview_tag_colors,
+    normalize_whitespace,
+)
 
 
 class ResultsScreen(ctk.CTkFrame):
     def __init__(self, master, app):
         super().__init__(master)
         self.app = app
+        self._db_name = ""
+        self._db_winner_places = None
         self._build_ui()
         self._recalculate()
         self._refresh()
@@ -32,9 +39,10 @@ class ResultsScreen(ctk.CTkFrame):
         self.name_entry = ctk.CTkEntry(name_frame, width=300)
         self.name_entry.pack(side="left", padx=(0, 5))
         self.name_entry.bind("<Return>", lambda e: self._on_apply_name())
+        self.name_entry.bind("<KeyRelease>", lambda e: self._check_changes())
         self.apply_name_btn = ctk.CTkButton(
             name_frame, text="Zastosuj", width=110,
-            command=self._on_apply_name,
+            command=self._on_apply_name, state="disabled",
         )
         self.apply_name_btn.pack(side="left")
 
@@ -81,10 +89,12 @@ class ResultsScreen(ctk.CTkFrame):
         self.winner_places_entry = ctk.CTkEntry(control_frame, width=60)
         self.winner_places_entry.pack(side="left", padx=(0, 5))
         self.winner_places_entry.bind("<Return>", lambda e: self._on_apply_winner_places())
-        ctk.CTkButton(
+        self.winner_places_entry.bind("<KeyRelease>", lambda e: self._check_changes())
+        self.apply_winner_places_btn = ctk.CTkButton(
             control_frame, text="Zastosuj", width=90,
-            command=self._on_apply_winner_places,
-        ).pack(side="left")
+            command=self._on_apply_winner_places, state="disabled",
+        )
+        self.apply_winner_places_btn.pack(side="left")
 
         columns = ("place", "name", "weight_g", "weight_kg")
         headings = ("Miejsce", "Imię i Nazwisko", "Waga (g)", "Waga (kg)")
@@ -154,9 +164,19 @@ class ResultsScreen(ctk.CTkFrame):
 
     def _refresh_name(self, conn):
         comp = competition_repo.get_by_id(conn, self.app.competition_id)
-        self.name_entry.delete(0, "end")
-        if comp and comp.name:
-            self.name_entry.insert(0, comp.name)
+        new_db_name = comp.name if comp and comp.name else ""
+
+        current_entry = normalize_whitespace(self.name_entry.get())
+        was_dirty = current_entry != (self._db_name or "")
+
+        self._db_name = new_db_name
+
+        if not was_dirty:
+            self.name_entry.delete(0, "end")
+            if new_db_name:
+                self.name_entry.insert(0, new_db_name)
+
+        self._check_changes()
 
     def _refresh_classification(self, conn):
         self.class_tree.delete(*self.class_tree.get_children())
@@ -181,13 +201,27 @@ class ResultsScreen(ctk.CTkFrame):
             ))
 
     def _refresh_winners(self, conn):
-        self.winners_tree.delete(*self.winners_tree.get_children())
         comp = competition_repo.get_by_id(conn, self.app.competition_id)
-        winner_places = comp.winner_places if comp else 3
+        new_db_winner_places = comp.winner_places if comp else 3
 
-        self.winner_places_entry.delete(0, "end")
-        self.winner_places_entry.insert(0, str(winner_places))
+        if self._db_winner_places is None:
+            was_dirty = False
+        else:
+            current_entry = self.winner_places_entry.get().strip()
+            was_dirty = current_entry != str(self._db_winner_places)
 
+        self._db_winner_places = new_db_winner_places
+
+        if not was_dirty:
+            self.winner_places_entry.delete(0, "end")
+            self.winner_places_entry.insert(0, str(new_db_winner_places))
+
+        self._check_changes()
+
+        self._refresh_winners_tree(conn, new_db_winner_places)
+
+    def _refresh_winners_tree(self, conn, winner_places):
+        self.winners_tree.delete(*self.winners_tree.get_children())
         service = RankingService(SectorService())
         winners = service.get_winners(conn, self.app.competition_id, winner_places)
 
@@ -200,44 +234,85 @@ class ResultsScreen(ctk.CTkFrame):
                 format_weight_kg(c.weight_grams),
             ))
 
+    def _check_changes(self):
+        name_now = normalize_whitespace(self.name_entry.get())
+        name_db = self._db_name or ""
+        name_dirty = name_now != name_db
+        self.apply_name_btn.configure(state="normal" if name_dirty else "disabled")
+
+        if self._db_winner_places is None:
+            wp_dirty = False
+        else:
+            wp_now = self.winner_places_entry.get().strip()
+            wp_dirty = wp_now != str(self._db_winner_places)
+        self.apply_winner_places_btn.configure(state="normal" if wp_dirty else "disabled")
+
+    def _has_unsaved_changes(self) -> bool:
+        name_dirty = normalize_whitespace(self.name_entry.get()) != (self._db_name or "")
+        if self._db_winner_places is None:
+            wp_dirty = False
+        else:
+            wp_dirty = self.winner_places_entry.get().strip() != str(self._db_winner_places)
+        return name_dirty or wp_dirty
+
+    def _warn_unsaved_changes(self):
+        messagebox.showwarning(
+            "Niezapisane zmiany",
+            "Masz niezapisane zmiany w polach ekranu.\n\n"
+            "Przed wydrukiem kliknij przycisk 'Zastosuj' przy zmienionym polu, "
+            "aby zapisać zmiany, albo przywróć pierwotne wartości ręcznie.",
+            parent=self,
+        )
+
     def _sync_winner_places_from_entry(self, conn) -> bool:
         """Save entry value to DB if it differs. Returns True on success, False if invalid."""
         entry_text = self.winner_places_entry.get().strip()
         try:
             new_value = int(entry_text)
         except ValueError:
-            messagebox.showerror("Błąd", "Liczba miejsc nagradzanych musi być liczbą całkowitą")
+            messagebox.showerror("Błąd", "Liczba miejsc nagradzanych musi być liczbą całkowitą", parent=self)
             return False
         if new_value < 1:
-            messagebox.showerror("Błąd", "Liczba miejsc nagradzanych musi być co najmniej 1")
+            messagebox.showerror("Błąd", "Liczba miejsc nagradzanych musi być co najmniej 1", parent=self)
             return False
 
         comp = competition_repo.get_by_id(conn, self.app.competition_id)
         if comp and comp.winner_places != new_value:
             competition_repo.update_winner_places(conn, self.app.competition_id, new_value)
             conn.commit()
+            self._db_winner_places = new_value
+            self.winner_places_entry.delete(0, "end")
+            self.winner_places_entry.insert(0, str(new_value))
+            self.apply_winner_places_btn.configure(text="\u2713 Zapisano")
+            self.after(1500, lambda: self.apply_winner_places_btn.configure(text="Zastosuj"))
         return True
 
     def _on_apply_winner_places(self):
         conn = self.app.get_connection()
         try:
             if self._sync_winner_places_from_entry(conn):
-                self._refresh_winners(conn)
+                self._refresh_winners_tree(conn, self._db_winner_places)
+                self._check_changes()
         finally:
             conn.close()
 
     def _on_apply_name(self):
-        new_name = self.name_entry.get().strip() or None
+        new_name = normalize_whitespace(self.name_entry.get()) or None
         conn = self.app.get_connection()
         try:
             comp = competition_repo.get_by_id(conn, self.app.competition_id)
             if comp and comp.name != new_name:
                 competition_repo.update_name(conn, self.app.competition_id, new_name)
                 conn.commit()
+                self._db_name = new_name or ""
+                self.name_entry.delete(0, "end")
+                if new_name:
+                    self.name_entry.insert(0, new_name)
+                self.apply_name_btn.configure(text="\u2713 Zapisano")
+                self.after(1500, lambda: self.apply_name_btn.configure(text="Zastosuj"))
+                self._check_changes()
         finally:
             conn.close()
-        self.apply_name_btn.configure(text="\u2713 Zapisano")
-        self.after(1500, lambda: self.apply_name_btn.configure(text="Zastosuj"))
 
     def _get_comp_and_venue(self, conn):
         comp = competition_repo.get_by_id(conn, self.app.competition_id)
@@ -245,6 +320,9 @@ class ResultsScreen(ctk.CTkFrame):
         return comp, venue
 
     def _print_classification(self):
+        if self._has_unsaved_changes():
+            self._warn_unsaved_changes()
+            return
         conn = self.app.get_connection()
         try:
             comp, venue = self._get_comp_and_venue(conn)
@@ -258,6 +336,9 @@ class ResultsScreen(ctk.CTkFrame):
             conn.close()
 
     def _print_winners(self):
+        if self._has_unsaved_changes():
+            self._warn_unsaved_changes()
+            return
         conn = self.app.get_connection()
         try:
             comp, venue = self._get_comp_and_venue(conn)
@@ -271,6 +352,9 @@ class ResultsScreen(ctk.CTkFrame):
             conn.close()
 
     def _print_sectors(self):
+        if self._has_unsaved_changes():
+            self._warn_unsaved_changes()
+            return
         conn = self.app.get_connection()
         try:
             comp, venue = self._get_comp_and_venue(conn)
@@ -288,6 +372,7 @@ class ResultsScreen(ctk.CTkFrame):
                 messagebox.showinfo(
                     "PDF",
                     f"Wygenerowano {len(paths)} plików PDF w:\n{folder}",
+                    parent=self,
                 )
                 if os.name == 'nt':
                     os.startfile(folder)
@@ -295,7 +380,7 @@ class ResultsScreen(ctk.CTkFrame):
                     import subprocess
                     subprocess.Popen(['xdg-open', str(folder)])
             else:
-                messagebox.showwarning("PDF", "Brak sektorów do wydruku.")
+                messagebox.showwarning("PDF", "Brak sektorów do wydruku.", parent=self)
         finally:
             conn.close()
 

@@ -568,3 +568,26 @@ class TestUpdateWinnerPlaces:
         winner_names = [w.full_name for w in winners]
         expected_winner_names = [name for _, name, _, _, _ in EXPECTED_FINAL_CLASSIFICATION[:10]]
         assert winner_names == expected_winner_names
+
+
+class TestUpdateName:
+    def test_update_name_persists(self, db):
+        competition_id, _ = _setup_competition(db)
+
+        comp = competition_repo.get_by_id(db, competition_id)
+        assert comp.name == "Zawody 28.09.2025"
+
+        competition_repo.update_name(db, competition_id, "Liga Karpiowa 2026")
+        db.commit()
+
+        comp = competition_repo.get_by_id(db, competition_id)
+        assert comp.name == "Liga Karpiowa 2026"
+
+    def test_update_name_to_none(self, db):
+        competition_id, _ = _setup_competition(db)
+
+        competition_repo.update_name(db, competition_id, None)
+        db.commit()
+
+        comp = competition_repo.get_by_id(db, competition_id)
+        assert comp.name is None

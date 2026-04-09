@@ -5,6 +5,7 @@ import customtkinter as ctk
 from app.constants import PAYMENT_DISPLAY, PAYMENT_LABELS, PAYMENT_REVERSE
 from app.repositories import competitor_repo
 from app.services.sector_service import SectorService
+from app.utils import normalize_whitespace
 
 
 class EditCompetitorDialog(ctk.CTkToplevel):
@@ -71,7 +72,7 @@ class EditCompetitorDialog(ctk.CTkToplevel):
         ).place(x=205, y=230)
 
     def _check_changes(self):
-        name_now = self.name_entry.get().strip()
+        name_now = normalize_whitespace(self.name_entry.get())
         phone_now = self.phone_entry.get().strip()
         payment_now = self.payment_var.get()
         station_now = self.station_entry.get().strip()
@@ -85,7 +86,7 @@ class EditCompetitorDialog(ctk.CTkToplevel):
 
     def _on_save(self):
         from tkinter import messagebox
-        full_name = self.name_entry.get().strip()
+        full_name = normalize_whitespace(self.name_entry.get())
         if not full_name:
             messagebox.showwarning("Błąd", "Imię i nazwisko nie może być puste.", parent=self)
             return

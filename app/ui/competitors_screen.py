@@ -6,7 +6,7 @@ import customtkinter as ctk
 from app.constants import PAYMENT_DISPLAY, PAYMENT_LABELS, PAYMENT_VALUES
 from app.repositories import competitor_repo, competition_repo
 from app.services.sector_service import SectorService
-from app.utils import configure_treeview_style, get_treeview_tag_colors
+from app.utils import configure_treeview_style, get_treeview_tag_colors, normalize_whitespace
 
 _COLUMNS = ("nr", "name", "phone", "payment", "present", "station", "sector")
 _HEADINGS = ("Nr", "Imi\u0119 i Nazwisko", "Telefon", "Op\u0142ata", "Obecny", "Stanowisko", "Sektor")
@@ -190,7 +190,7 @@ class CompetitorsScreen(ctk.CTkFrame):
             ))
 
     def _add_competitor(self):
-        name = self.name_entry.get().strip()
+        name = normalize_whitespace(self.name_entry.get())
 
         if not name:
             messagebox.showwarning("Błąd", "Imię i nazwisko jest wymagane.")
@@ -324,6 +324,7 @@ class CompetitorsScreen(ctk.CTkFrame):
                 messagebox.showwarning("Błąd", "Nie można przypisać stanowiska nieobecnemu zawodnikowi.")
                 return
             self.sector_service.assign_station(conn, competitor_id, station_number, self.app.venue_id, self.app.competition_id)
+            conn.commit()
         except ValueError as e:
             messagebox.showwarning("Błąd", str(e))
             return
