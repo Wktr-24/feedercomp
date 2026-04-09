@@ -130,10 +130,16 @@ def set_all_present(conn: sqlite3.Connection, competition_id: int, limit: int | 
         conn.execute("UPDATE competitors SET is_present = 1 WHERE competition_id = ?", (competition_id,))
 
 
-def update_details(conn: sqlite3.Connection, competitor_id: int, phone: str | None, payment_status: str) -> None:
+def update_details(
+    conn: sqlite3.Connection,
+    competitor_id: int,
+    full_name: str,
+    phone: str | None,
+    payment_status: str,
+) -> None:
     conn.execute(
-        "UPDATE competitors SET phone = ?, payment_status = ? WHERE id = ?",
-        (phone, payment_status, competitor_id),
+        "UPDATE competitors SET full_name = ?, phone = ?, payment_status = ? WHERE id = ?",
+        (full_name, phone, payment_status, competitor_id),
     )
 
 

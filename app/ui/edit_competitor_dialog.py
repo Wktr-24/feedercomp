@@ -17,12 +17,13 @@ class EditCompetitorDialog(ctk.CTkToplevel):
         self.on_save = on_save
         self.sector_service = SectorService()
 
+        self.original_name = competitor.full_name
         self.original_phone = competitor.phone or ""
         self.original_payment = PAYMENT_LABELS.get(competitor.payment_status, PAYMENT_DISPLAY[0])
         self.original_station = str(competitor.station_number) if competitor.station_number else ""
 
         self.title(f"Edycja \u2014 {competitor.full_name}")
-        self.geometry("350x240")
+        self.geometry("380x290")
         self.resizable(False, False)
 
         self._build_ui()
@@ -34,23 +35,29 @@ class EditCompetitorDialog(ctk.CTkToplevel):
         self.focus_set()
 
     def _build_ui(self):
-        ctk.CTkLabel(self, text="Telefon:", font=("Segoe UI", 14)).place(x=20, y=20)
-        self.phone_entry = ctk.CTkEntry(self, width=200)
-        self.phone_entry.place(x=120, y=20)
+        ctk.CTkLabel(self, text="Imi\u0119 i Nazwisko:", font=("Segoe UI", 14)).place(x=20, y=20)
+        self.name_entry = ctk.CTkEntry(self, width=220)
+        self.name_entry.place(x=150, y=20)
+        self.name_entry.insert(0, self.original_name)
+        self.name_entry.bind("<KeyRelease>", lambda _: self._check_changes())
+
+        ctk.CTkLabel(self, text="Telefon:", font=("Segoe UI", 14)).place(x=20, y=65)
+        self.phone_entry = ctk.CTkEntry(self, width=220)
+        self.phone_entry.place(x=150, y=65)
         if self.original_phone:
             self.phone_entry.insert(0, self.original_phone)
         self.phone_entry.bind("<KeyRelease>", lambda _: self._check_changes())
 
-        ctk.CTkLabel(self, text="Op\u0142ata:", font=("Segoe UI", 14)).place(x=20, y=65)
+        ctk.CTkLabel(self, text="Op\u0142ata:", font=("Segoe UI", 14)).place(x=20, y=110)
         self.payment_var = ctk.StringVar(value=self.original_payment)
         self.payment_var.trace_add("write", lambda *_: self._check_changes())
         ctk.CTkOptionMenu(
-            self, variable=self.payment_var, values=PAYMENT_DISPLAY, width=200,
-        ).place(x=120, y=65)
+            self, variable=self.payment_var, values=PAYMENT_DISPLAY, width=220,
+        ).place(x=150, y=110)
 
-        ctk.CTkLabel(self, text="Stanowisko:", font=("Segoe UI", 14)).place(x=20, y=110)
-        self.station_entry = ctk.CTkEntry(self, width=200)
-        self.station_entry.place(x=120, y=110)
+        ctk.CTkLabel(self, text="Stanowisko:", font=("Segoe UI", 14)).place(x=20, y=155)
+        self.station_entry = ctk.CTkEntry(self, width=220)
+        self.station_entry.place(x=150, y=155)
         if self.original_station:
             self.station_entry.insert(0, self.original_station)
         self.station_entry.bind("<KeyRelease>", lambda _: self._check_changes())
@@ -58,17 +65,19 @@ class EditCompetitorDialog(ctk.CTkToplevel):
         self.save_btn = ctk.CTkButton(
             self, text="Zapisz", command=self._on_save, width=100, state="disabled",
         )
-        self.save_btn.place(x=60, y=185)
+        self.save_btn.place(x=75, y=230)
         ctk.CTkButton(
             self, text="Anuluj", command=self.destroy, width=100,
-        ).place(x=190, y=185)
+        ).place(x=205, y=230)
 
     def _check_changes(self):
+        name_now = self.name_entry.get().strip()
         phone_now = self.phone_entry.get().strip()
         payment_now = self.payment_var.get()
         station_now = self.station_entry.get().strip()
         changed = (
-            phone_now != self.original_phone
+            name_now != self.original_name
+            or phone_now != self.original_phone
             or payment_now != self.original_payment
             or station_now != self.original_station
         )
@@ -76,6 +85,10 @@ class EditCompetitorDialog(ctk.CTkToplevel):
 
     def _on_save(self):
         from tkinter import messagebox
+        full_name = self.name_entry.get().strip()
+        if not full_name:
+            messagebox.showwarning("Błąd", "Imię i nazwisko nie może być puste.", parent=self)
+            return
         phone = self.phone_entry.get().strip() or None
         if phone and (len(phone) != 9 or not phone.isdigit()):
             messagebox.showwarning("Błąd", "Numer telefonu musi mieć dokładnie 9 cyfr.", parent=self)
@@ -100,7 +113,7 @@ class EditCompetitorDialog(ctk.CTkToplevel):
                 conn = self.app.get_connection()
                 try:
                     competitor_repo.update_station(conn, self.competitor.id, None, None)
-                    competitor_repo.update_details(conn, self.competitor.id, phone, payment_status)
+                    competitor_repo.update_details(conn, self.competitor.id, full_name, phone, payment_status)
                     conn.commit()
                 finally:
                     conn.close()
@@ -121,7 +134,7 @@ class EditCompetitorDialog(ctk.CTkToplevel):
                         conn, self.competitor.id, station_number,
                         self.app.venue_id, self.app.competition_id,
                     )
-                    competitor_repo.update_details(conn, self.competitor.id, phone, payment_status)
+                    competitor_repo.update_details(conn, self.competitor.id, full_name, phone, payment_status)
                     conn.commit()
                 except ValueError as e:
                     messagebox.showwarning("Błąd", str(e), parent=self)
@@ -134,7 +147,7 @@ class EditCompetitorDialog(ctk.CTkToplevel):
         else:
             conn = self.app.get_connection()
             try:
-                competitor_repo.update_details(conn, self.competitor.id, phone, payment_status)
+                competitor_repo.update_details(conn, self.competitor.id, full_name, phone, payment_status)
                 conn.commit()
             finally:
                 conn.close()
