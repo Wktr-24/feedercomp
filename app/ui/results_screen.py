@@ -19,8 +19,24 @@ class ResultsScreen(ctk.CTkFrame):
         self._refresh()
 
     def _build_ui(self):
+        self._build_name_bar()
         self._build_tabview()
         self._build_bottom()
+
+    def _build_name_bar(self):
+        name_frame = ctk.CTkFrame(self)
+        name_frame.pack(fill="x", padx=5, pady=(5, 2))
+        ctk.CTkLabel(
+            name_frame, text="Nazwa zawodów:", font=("Segoe UI", 13),
+        ).pack(side="left", padx=(10, 5))
+        self.name_entry = ctk.CTkEntry(name_frame, width=300)
+        self.name_entry.pack(side="left", padx=(0, 5))
+        self.name_entry.bind("<Return>", lambda e: self._on_apply_name())
+        self.apply_name_btn = ctk.CTkButton(
+            name_frame, text="Zastosuj", width=110,
+            command=self._on_apply_name,
+        )
+        self.apply_name_btn.pack(side="left")
 
     # -- Tabview --
 
@@ -130,10 +146,17 @@ class ResultsScreen(ctk.CTkFrame):
     def _refresh(self):
         conn = self.app.get_connection()
         try:
+            self._refresh_name(conn)
             self._refresh_classification(conn)
             self._refresh_winners(conn)
         finally:
             conn.close()
+
+    def _refresh_name(self, conn):
+        comp = competition_repo.get_by_id(conn, self.app.competition_id)
+        self.name_entry.delete(0, "end")
+        if comp and comp.name:
+            self.name_entry.insert(0, comp.name)
 
     def _refresh_classification(self, conn):
         self.class_tree.delete(*self.class_tree.get_children())
@@ -202,6 +225,19 @@ class ResultsScreen(ctk.CTkFrame):
                 self._refresh_winners(conn)
         finally:
             conn.close()
+
+    def _on_apply_name(self):
+        new_name = self.name_entry.get().strip() or None
+        conn = self.app.get_connection()
+        try:
+            comp = competition_repo.get_by_id(conn, self.app.competition_id)
+            if comp and comp.name != new_name:
+                competition_repo.update_name(conn, self.app.competition_id, new_name)
+                conn.commit()
+        finally:
+            conn.close()
+        self.apply_name_btn.configure(text="\u2713 Zapisano")
+        self.after(1500, lambda: self.apply_name_btn.configure(text="Zastosuj"))
 
     def _get_comp_and_venue(self, conn):
         comp = competition_repo.get_by_id(conn, self.app.competition_id)

@@ -43,5 +43,12 @@ def update_winner_places(conn: sqlite3.Connection, competition_id: int, winner_p
     )
 
 
+def update_name(conn: sqlite3.Connection, competition_id: int, name: str | None) -> None:
+    conn.execute(
+        "UPDATE competitions SET name = ? WHERE id = ?",
+        (name, competition_id),
+    )
+
+
 def delete(conn: sqlite3.Connection, competition_id: int) -> None:
     conn.execute("DELETE FROM competitions WHERE id = ?", (competition_id,))
