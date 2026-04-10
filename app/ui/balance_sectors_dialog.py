@@ -18,6 +18,8 @@ class BalanceSectorsDialog(FeederCompDialog):
         self.sector_service = SectorService()
         self.selected_stations: set[tuple[str, int]] = set()
         self.station_buttons: dict[tuple[str, int], ctk.CTkButton] = {}
+        self._hover_after_id = None
+        self._hover_leave_after_id = None
 
         conn = self.app.get_connection()
         try:
@@ -32,9 +34,12 @@ class BalanceSectorsDialog(FeederCompDialog):
         from app.repositories import competitor_repo
         competitors = competitor_repo.get_all(conn, self.competition_id)
         self.present_count = sum(1 for c in competitors if c.is_present)
-        self.assigned_stations = {
-            c.station_number for c in competitors if c.station_number is not None
+        self.assigned_stations_info = {
+            c.station_number: c.full_name
+            for c in competitors
+            if c.station_number is not None
         }
+        self.assigned_stations = set(self.assigned_stations_info.keys())
 
         self.already_excluded = excluded_station_repo.get_excluded(conn, self.competition_id)
         already_excluded_set = {
@@ -129,6 +134,12 @@ class BalanceSectorsDialog(FeederCompDialog):
         )
         self.counter_label.pack(padx=10, pady=(5, 2))
 
+        self.hover_status_label = ctk.CTkLabel(
+            self, text="", font=("Segoe UI", 13),
+            text_color=("gray40", "gray70"),
+        )
+        self.hover_status_label.pack(padx=10, pady=(0, 2))
+
         btn_frame = ctk.CTkFrame(self)
         btn_frame.pack(fill="x", padx=10, pady=(2, 10))
 
@@ -171,6 +182,9 @@ class BalanceSectorsDialog(FeederCompDialog):
                 text_color_disabled="#FFFFFF",
                 state="disabled",
             )
+            full_name = self.assigned_stations_info[station]
+            btn.bind("<Enter>", lambda e, name=full_name: self._on_station_hover_enter(name))
+            btn.bind("<Leave>", lambda e: self._on_station_hover_leave())
         elif is_selected:
             btn.configure(fg_color="#922B21", hover_color="#7B241C", text_color="#FFFFFF")
 
@@ -269,3 +283,46 @@ class BalanceSectorsDialog(FeederCompDialog):
         if self.on_confirm:
             self.on_confirm()
         self.destroy()
+
+    def _on_station_hover_enter(self, full_name: str) -> None:
+        # Cancel pending clear — we're still hovering (possibly over a sibling
+        # child widget of the same button, which fires spurious Leave/Enter)
+        if self._hover_leave_after_id is not None:
+            self.after_cancel(self._hover_leave_after_id)
+            self._hover_leave_after_id = None
+        if self._hover_after_id is not None:
+            self.after_cancel(self._hover_after_id)
+        self._hover_after_id = self.after(150, lambda: self._show_hover_name(full_name))
+
+    def _on_station_hover_leave(self) -> None:
+        if self._hover_after_id is not None:
+            self.after_cancel(self._hover_after_id)
+            self._hover_after_id = None
+        # Debounce clear — CTkButton bindings fire Leave/Enter when cursor
+        # moves between internal _canvas and _text_label widgets of the same
+        # button. Wait 50ms to see if Enter fires on any button before clearing.
+        if self._hover_leave_after_id is not None:
+            self.after_cancel(self._hover_leave_after_id)
+        self._hover_leave_after_id = self.after(50, self._clear_hover_label)
+
+    def _clear_hover_label(self) -> None:
+        self._hover_leave_after_id = None
+        if self.hover_status_label.winfo_exists():
+            self.hover_status_label.configure(text="")
+
+    def _show_hover_name(self, full_name: str) -> None:
+        self._hover_after_id = None
+        if not self.hover_status_label.winfo_exists():
+            return
+        self.hover_status_label.configure(text=full_name)
+
+    def destroy(self):
+        for attr in ('_hover_after_id', '_hover_leave_after_id'):
+            val = getattr(self, attr, None)
+            if val is not None:
+                try:
+                    self.after_cancel(val)
+                except Exception:
+                    pass
+                setattr(self, attr, None)
+        super().destroy()
