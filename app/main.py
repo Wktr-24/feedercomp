@@ -1,10 +1,9 @@
-import os
-
 import customtkinter as ctk
 
 from app.config import get_bundle_dir, get_db_path
 from app.database import init_db
 from app.ui.app_window import AppWindow
+from app.utils import set_window_icon
 
 
 def main():
@@ -24,10 +23,7 @@ def main():
     root.geometry("1100x700")
     root.minsize(900, 600)
 
-    if os.name == 'nt':
-        icon_path = get_bundle_dir() / "assets" / "feederland-favicon.ico"
-        if icon_path.exists():
-            root.iconbitmap(str(icon_path))
+    set_window_icon(root)
 
     app = AppWindow(root, db_path)
     app.pack(fill="both", expand=True)

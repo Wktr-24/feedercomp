@@ -4,6 +4,7 @@ import customtkinter as ctk
 
 from app.repositories import excluded_station_repo, venue_repo
 from app.services.sector_service import SectorService
+from app.utils import set_window_icon
 
 
 class BalanceSectorsDialog(ctk.CTkToplevel):
@@ -22,6 +23,7 @@ class BalanceSectorsDialog(ctk.CTkToplevel):
         self.title("Wyrównanie sektorów")
         self.geometry("1100x500")
         self.resizable(False, False)
+        set_window_icon(self)
 
         conn = self.app.get_connection()
         try:

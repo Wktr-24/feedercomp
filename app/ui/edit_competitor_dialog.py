@@ -5,7 +5,7 @@ import customtkinter as ctk
 from app.constants import PAYMENT_DISPLAY, PAYMENT_LABELS, PAYMENT_REVERSE
 from app.repositories import competitor_repo
 from app.services.sector_service import SectorService
-from app.utils import normalize_whitespace
+from app.utils import normalize_whitespace, set_window_icon
 
 
 class EditCompetitorDialog(ctk.CTkToplevel):
@@ -26,6 +26,7 @@ class EditCompetitorDialog(ctk.CTkToplevel):
         self.title(f"Edycja \u2014 {competitor.full_name}")
         self.geometry("380x290")
         self.resizable(False, False)
+        set_window_icon(self)
 
         self._build_ui()
 

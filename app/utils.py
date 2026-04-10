@@ -1,4 +1,36 @@
+import os
 import re
+
+from app.config import get_bundle_dir
+
+
+def set_window_icon(window) -> None:
+    """Set the Feederland icon on a Tk window (root or Toplevel).
+
+    Windows-only (uses .ico). No-op on other platforms or if icon missing.
+
+    CTkToplevel schedules its own ``self.after(200, self.iconbitmap(...))``
+    during ``__init__``, which overwrites any icon set synchronously. To beat
+    it we re-apply the icon with a longer delay, so our call runs after CTk's.
+    """
+    if os.name != 'nt':
+        return
+    icon_path = get_bundle_dir() / "assets" / "feederland-favicon.ico"
+    if not icon_path.exists():
+        return
+    icon_str = str(icon_path)
+
+    def _apply():
+        try:
+            window.wm_iconbitmap(icon_str)
+        except Exception:
+            pass
+
+    _apply()
+    try:
+        window.after(250, _apply)
+    except Exception:
+        pass
 
 
 def normalize_whitespace(text: str) -> str:
