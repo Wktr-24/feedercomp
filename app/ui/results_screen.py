@@ -164,7 +164,8 @@ class ResultsScreen(ctk.CTkFrame):
 
     def _refresh_name(self, conn):
         comp = competition_repo.get_by_id(conn, self.app.competition_id)
-        new_db_name = comp.name if comp and comp.name else ""
+        raw_db_name = comp.name if comp and comp.name else ""
+        new_db_name = normalize_whitespace(raw_db_name)
 
         current_entry = normalize_whitespace(self.name_entry.get())
         was_dirty = current_entry != (self._db_name or "")
@@ -281,10 +282,12 @@ class ResultsScreen(ctk.CTkFrame):
             competition_repo.update_winner_places(conn, self.app.competition_id, new_value)
             conn.commit()
             self._db_winner_places = new_value
-            self.winner_places_entry.delete(0, "end")
-            self.winner_places_entry.insert(0, str(new_value))
             self.apply_winner_places_btn.configure(text="\u2713 Zapisano")
             self.after(1500, lambda: self.apply_winner_places_btn.configure(text="Zastosuj"))
+
+        self.winner_places_entry.delete(0, "end")
+        self.winner_places_entry.insert(0, str(new_value))
+        self._check_changes()
         return True
 
     def _on_apply_winner_places(self):

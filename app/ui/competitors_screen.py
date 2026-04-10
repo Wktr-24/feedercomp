@@ -193,12 +193,12 @@ class CompetitorsScreen(ctk.CTkFrame):
         name = normalize_whitespace(self.name_entry.get())
 
         if not name:
-            messagebox.showwarning("Błąd", "Imię i nazwisko jest wymagane.")
+            messagebox.showwarning("Błąd", "Imię i nazwisko jest wymagane.", parent=self)
             return
 
         phone = self.phone_entry.get().strip() or None
         if phone and (len(phone) != 9 or not phone.isdigit()):
-            messagebox.showwarning("Błąd", "Numer telefonu musi mieć dokładnie 9 cyfr.")
+            messagebox.showwarning("Błąd", "Numer telefonu musi mieć dokładnie 9 cyfr.", parent=self)
             return
         display_payment = self.payment_var.get()
         idx = PAYMENT_DISPLAY.index(display_payment) if display_payment in PAYMENT_DISPLAY else 0
@@ -215,6 +215,7 @@ class CompetitorsScreen(ctk.CTkFrame):
             messagebox.showinfo(
                 "Lista rezerwowa",
                 f"Zawodnik zostanie dodany na listę rezerwową (limit: {self.max_competitors}).",
+                parent=self,
             )
 
         conn = self.app.get_connection()
@@ -232,7 +233,7 @@ class CompetitorsScreen(ctk.CTkFrame):
     def _toggle_presence(self):
         selection = self.tree.selection()
         if not selection:
-            messagebox.showwarning("Błąd", "Zaznacz zawodnika.")
+            messagebox.showwarning("Błąd", "Zaznacz zawodnika.", parent=self)
             return
 
         competitor_id = int(selection[0])
@@ -251,6 +252,7 @@ class CompetitorsScreen(ctk.CTkFrame):
                         "Błąd",
                         f"Osiągnięto limit obecnych ({self.max_competitors}). "
                         "Odznacz kogoś innego, aby zwolnić miejsce.",
+                        parent=self,
                     )
                     return
             else:
@@ -302,18 +304,18 @@ class CompetitorsScreen(ctk.CTkFrame):
     def _assign_station(self):
         selection = self.tree.selection()
         if not selection:
-            messagebox.showwarning("B\u0142\u0105d", "Zaznacz zawodnika w tabeli.")
+            messagebox.showwarning("B\u0142\u0105d", "Zaznacz zawodnika w tabeli.", parent=self)
             return
 
         station_str = self.station_entry.get().strip()
         if not station_str:
-            messagebox.showwarning("B\u0142\u0105d", "Wpisz numer stanowiska.")
+            messagebox.showwarning("B\u0142\u0105d", "Wpisz numer stanowiska.", parent=self)
             return
 
         try:
             station_number = int(station_str)
         except ValueError:
-            messagebox.showwarning("B\u0142\u0105d", "Numer stanowiska musi by\u0107 liczb\u0105.")
+            messagebox.showwarning("B\u0142\u0105d", "Numer stanowiska musi by\u0107 liczb\u0105.", parent=self)
             return
 
         competitor_id = int(selection[0])
@@ -321,15 +323,15 @@ class CompetitorsScreen(ctk.CTkFrame):
         try:
             competitor = competitor_repo.get_by_id(conn, competitor_id)
             if competitor and not competitor.is_present:
-                messagebox.showwarning("Błąd", "Nie można przypisać stanowiska nieobecnemu zawodnikowi.")
+                messagebox.showwarning("Błąd", "Nie można przypisać stanowiska nieobecnemu zawodnikowi.", parent=self)
                 return
             self.sector_service.assign_station(conn, competitor_id, station_number, self.app.venue_id, self.app.competition_id)
             conn.commit()
         except ValueError as e:
-            messagebox.showwarning("Błąd", str(e))
+            messagebox.showwarning("Błąd", str(e), parent=self)
             return
         except sqlite3.IntegrityError:
-            messagebox.showwarning("B\u0142\u0105d", f"Stanowisko {station_number} jest ju\u017c zaj\u0119te.")
+            messagebox.showwarning("B\u0142\u0105d", f"Stanowisko {station_number} jest ju\u017c zaj\u0119te.", parent=self)
             return
         finally:
             conn.close()
@@ -340,7 +342,7 @@ class CompetitorsScreen(ctk.CTkFrame):
     def _delete_selected(self):
         selection = self.tree.selection()
         if not selection:
-            messagebox.showwarning("B\u0142\u0105d", "Zaznacz zawodnika do usuni\u0119cia.")
+            messagebox.showwarning("B\u0142\u0105d", "Zaznacz zawodnika do usuni\u0119cia.", parent=self)
             return
 
         competitor_id = int(selection[0])

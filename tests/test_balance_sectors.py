@@ -94,6 +94,7 @@ class TestAssignStationRejectsExcluded:
         db.commit()
 
         self.service.assign_station(db, competitor_id, 1, venue_id, competition_id)
+        db.commit()
 
     def test_allows_without_competition_id(self, db, venue_id, competition_id):
         competitor_id = db.execute(
@@ -105,6 +106,7 @@ class TestAssignStationRejectsExcluded:
         excluded_station_repo.add_excluded(db, competition_id, venue_id, 5, "A")
         db.commit()
         self.service.assign_station(db, competitor_id, 5, venue_id)
+        db.commit()
 
 
 class TestExcludedRepoCrud:

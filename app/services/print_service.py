@@ -1,4 +1,5 @@
 import os
+import re
 import tempfile
 from pathlib import Path
 from xml.sax.saxutils import escape
@@ -89,7 +90,8 @@ class PrintService:
                             venue_name: str, comp_date: str, comp_name: str | None) -> Path:
         from app.repositories import competitor_repo
 
-        filepath = self.output_dir / f"Sektor_{sector_name}.pdf"
+        safe_sector = re.sub(r'[^A-Za-z0-9_-]', '_', sector_name)
+        filepath = self.output_dir / f"Sektor_{safe_sector}.pdf"
         doc = SimpleDocTemplate(str(filepath), pagesize=A4,
                                 leftMargin=15*mm, rightMargin=15*mm,
                                 topMargin=15*mm, bottomMargin=15*mm)
@@ -99,7 +101,7 @@ class PrintService:
         styles = getSampleStyleSheet()
         sector_style = ParagraphStyle('SectorTitle', parent=styles['Heading2'],
                                        fontName=self.font_name_bold, alignment=TA_CENTER, fontSize=14)
-        elements.append(Paragraph(f"Sektor {sector_name}", sector_style))
+        elements.append(Paragraph(f"Sektor {escape(sector_name)}", sector_style))
         elements.append(Spacer(1, 3*mm))
 
         data = [['STANOWISKO', 'ZAWODNIK', 'WAGA (kg)', 'MIEJSCE']]
