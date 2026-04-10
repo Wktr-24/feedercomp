@@ -144,4 +144,19 @@ def update_details(
 
 
 def delete(conn: sqlite3.Connection, competitor_id: int) -> None:
+    row = conn.execute(
+        "SELECT competition_id, list_number FROM competitors WHERE id = ?",
+        (competitor_id,),
+    ).fetchone()
+    if row is None:
+        return
+
+    competition_id = row["competition_id"]
+    deleted_number = row["list_number"]
+
     conn.execute("DELETE FROM competitors WHERE id = ?", (competitor_id,))
+    conn.execute(
+        "UPDATE competitors SET list_number = list_number - 1 "
+        "WHERE competition_id = ? AND list_number > ?",
+        (competition_id, deleted_number),
+    )

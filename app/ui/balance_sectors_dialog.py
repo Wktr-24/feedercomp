@@ -1,3 +1,4 @@
+import tkinter
 from tkinter import messagebox
 
 import customtkinter as ctk
@@ -21,7 +22,6 @@ class BalanceSectorsDialog(ctk.CTkToplevel):
         self.station_buttons: dict[tuple[str, int], ctk.CTkButton] = {}
 
         self.title("Wyrównanie sektorów")
-        self.geometry("1100x500")
         self.resizable(False, False)
         set_window_icon(self)
 
@@ -32,11 +32,32 @@ class BalanceSectorsDialog(ctk.CTkToplevel):
         finally:
             conn.close()
 
+        self._center_on_master(master, 1100, 500)
         self.transient(master)
         self.update_idletasks()
         self.deiconify()
         self.grab_set()
         self.focus_set()
+
+    def resizable(self, width=None, height=None):
+        # Bypass CTkToplevel.resizable which schedules an after(10) callback
+        # that triggers an extra withdraw/deiconify cycle ~10ms after the
+        # dialog is shown, causing a visible flicker.
+        return tkinter.Toplevel.resizable(self, width, height)
+
+    def _center_on_master(self, master, width: int, height: int) -> None:
+        master.update_idletasks()
+        try:
+            mx = master.winfo_rootx()
+            my = master.winfo_rooty()
+            mw = master.winfo_width()
+            mh = master.winfo_height()
+        except tkinter.TclError:
+            self.geometry(f"{width}x{height}")
+            return
+        x = mx + max(0, (mw - width) // 2)
+        y = my + max(0, (mh - height) // 2)
+        self.geometry(f"{width}x{height}+{x}+{y}")
 
     def _load_data(self, conn):
         from app.repositories import competitor_repo
