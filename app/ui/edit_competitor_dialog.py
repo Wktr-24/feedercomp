@@ -1,18 +1,17 @@
 import sqlite3
-import tkinter
 
 import customtkinter as ctk
 
 from app.constants import PAYMENT_DISPLAY, PAYMENT_LABELS, PAYMENT_REVERSE
 from app.repositories import competitor_repo
 from app.services.sector_service import SectorService
-from app.utils import normalize_whitespace, set_window_icon
+from app.ui.base_dialog import FeederCompDialog
+from app.utils import normalize_whitespace
 
 
-class EditCompetitorDialog(ctk.CTkToplevel):
+class EditCompetitorDialog(FeederCompDialog):
     def __init__(self, master, app, competitor, on_save=None):
-        super().__init__(master)
-        self.withdraw()
+        super().__init__(master, f"Edycja \u2014 {competitor.full_name}", 380, 290)
 
         self.app = app
         self.competitor = competitor
@@ -24,38 +23,8 @@ class EditCompetitorDialog(ctk.CTkToplevel):
         self.original_payment = PAYMENT_LABELS.get(competitor.payment_status, PAYMENT_DISPLAY[0])
         self.original_station = str(competitor.station_number) if competitor.station_number else ""
 
-        self.title(f"Edycja \u2014 {competitor.full_name}")
-        self.resizable(False, False)
-        set_window_icon(self)
-
         self._build_ui()
-
-        self._center_on_master(master, 380, 290)
-        self.transient(master)
-        self.update_idletasks()
-        self.deiconify()
-        self.grab_set()
-        self.focus_set()
-
-    def resizable(self, width=None, height=None):
-        # Bypass CTkToplevel.resizable which schedules an after(10) callback
-        # that triggers an extra withdraw/deiconify cycle ~10ms after the
-        # dialog is shown, causing a visible flicker.
-        return tkinter.Toplevel.resizable(self, width, height)
-
-    def _center_on_master(self, master, width: int, height: int) -> None:
-        master.update_idletasks()
-        try:
-            mx = master.winfo_rootx()
-            my = master.winfo_rooty()
-            mw = master.winfo_width()
-            mh = master.winfo_height()
-        except tkinter.TclError:
-            self.geometry(f"{width}x{height}")
-            return
-        x = mx + max(0, (mw - width) // 2)
-        y = my + max(0, (mh - height) // 2)
-        self.geometry(f"{width}x{height}+{x}+{y}")
+        self.show_modal()
 
     def _build_ui(self):
         ctk.CTkLabel(self, text="Imi\u0119 i Nazwisko:", font=("Segoe UI", 14)).place(x=20, y=20)

@@ -1,17 +1,15 @@
-import tkinter
 from tkinter import messagebox
 
 import customtkinter as ctk
 
 from app.repositories import excluded_station_repo, venue_repo
 from app.services.sector_service import SectorService
-from app.utils import set_window_icon
+from app.ui.base_dialog import FeederCompDialog
 
 
-class BalanceSectorsDialog(ctk.CTkToplevel):
+class BalanceSectorsDialog(FeederCompDialog):
     def __init__(self, master, app, competition_id, venue_id, on_confirm=None):
-        super().__init__(master)
-        self.withdraw()
+        super().__init__(master, "Wyrównanie sektorów", 1100, 500)
 
         self.app = app
         self.competition_id = competition_id
@@ -21,10 +19,6 @@ class BalanceSectorsDialog(ctk.CTkToplevel):
         self.selected_stations: set[tuple[str, int]] = set()
         self.station_buttons: dict[tuple[str, int], ctk.CTkButton] = {}
 
-        self.title("Wyrównanie sektorów")
-        self.resizable(False, False)
-        set_window_icon(self)
-
         conn = self.app.get_connection()
         try:
             self._load_data(conn)
@@ -32,32 +26,7 @@ class BalanceSectorsDialog(ctk.CTkToplevel):
         finally:
             conn.close()
 
-        self._center_on_master(master, 1100, 500)
-        self.transient(master)
-        self.update_idletasks()
-        self.deiconify()
-        self.grab_set()
-        self.focus_set()
-
-    def resizable(self, width=None, height=None):
-        # Bypass CTkToplevel.resizable which schedules an after(10) callback
-        # that triggers an extra withdraw/deiconify cycle ~10ms after the
-        # dialog is shown, causing a visible flicker.
-        return tkinter.Toplevel.resizable(self, width, height)
-
-    def _center_on_master(self, master, width: int, height: int) -> None:
-        master.update_idletasks()
-        try:
-            mx = master.winfo_rootx()
-            my = master.winfo_rooty()
-            mw = master.winfo_width()
-            mh = master.winfo_height()
-        except tkinter.TclError:
-            self.geometry(f"{width}x{height}")
-            return
-        x = mx + max(0, (mw - width) // 2)
-        y = my + max(0, (mh - height) // 2)
-        self.geometry(f"{width}x{height}+{x}+{y}")
+        self.show_modal()
 
     def _load_data(self, conn):
         from app.repositories import competitor_repo
