@@ -61,6 +61,11 @@ class FeederCompDialog(ctk.CTkToplevel):
         # Center on the top-level window, not the immediate master frame —
         # the master is often a CTkFrame (e.g. CompetitorsScreen) which may
         # be narrower than the dialog, causing off-center placement.
+        #
+        # DPI note: winfo_width/rootx return already-scaled physical pixels,
+        # while CTkToplevel.geometry() applies window_scaling to width/height
+        # but NOT to x/y. Convert the logical dialog size to physical pixels
+        # before computing offsets so centering holds on non-100% DPI.
         width = self._dialog_width
         height = self._dialog_height
         try:
@@ -70,9 +75,12 @@ class FeederCompDialog(ctk.CTkToplevel):
             my = top.winfo_rooty()
             mw = top.winfo_width()
             mh = top.winfo_height()
+            scaling = self._get_window_scaling()
         except tkinter.TclError:
             self.geometry(f"{width}x{height}")
             return
-        x = mx + max(0, (mw - width) // 2)
-        y = my + max(0, (mh - height) // 2)
+        phys_width = int(round(width * scaling))
+        phys_height = int(round(height * scaling))
+        x = mx + max(0, (mw - phys_width) // 2)
+        y = my + max(0, (mh - phys_height) // 2)
         self.geometry(f"{width}x{height}+{x}+{y}")
