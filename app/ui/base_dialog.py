@@ -58,15 +58,18 @@ class FeederCompDialog(ctk.CTkToplevel):
         self._dialog_height = height
 
     def _center_on_master(self) -> None:
-        master = self._master_ref
+        # Center on the top-level window, not the immediate master frame —
+        # the master is often a CTkFrame (e.g. CompetitorsScreen) which may
+        # be narrower than the dialog, causing off-center placement.
         width = self._dialog_width
         height = self._dialog_height
-        master.update_idletasks()
         try:
-            mx = master.winfo_rootx()
-            my = master.winfo_rooty()
-            mw = master.winfo_width()
-            mh = master.winfo_height()
+            top = self._master_ref.winfo_toplevel()
+            top.update_idletasks()
+            mx = top.winfo_rootx()
+            my = top.winfo_rooty()
+            mw = top.winfo_width()
+            mh = top.winfo_height()
         except tkinter.TclError:
             self.geometry(f"{width}x{height}")
             return
