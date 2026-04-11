@@ -28,6 +28,12 @@ class BalanceSectorsDialog(FeederCompDialog):
         finally:
             conn.close()
 
+        # Dynamically size dialog to fit actual content (prevents cutoff on DPI-scaled displays)
+        self.update_idletasks()
+        req_width = max(self._dialog_width, self.winfo_reqwidth() + 40)
+        req_height = max(self._dialog_height, self.winfo_reqheight() + 20)
+        self.resize_to(req_width, req_height)
+
         self.show_modal()
 
     def _load_data(self, conn):
@@ -73,30 +79,37 @@ class BalanceSectorsDialog(FeederCompDialog):
         )
         header.pack(padx=10, pady=(10, 5))
 
+        num_sectors = len(sectors_lr)
+
         # --- top bank ---
         top_frame = ctk.CTkFrame(self, fg_color="transparent")
-        top_frame.pack(padx=10, pady=(5, 0))
+        top_frame.pack(fill="x", padx=10, pady=(5, 0))
+        for i in range(num_sectors):
+            top_frame.grid_columnconfigure(i, weight=1, uniform="sector")
 
         for idx, sector in enumerate(sectors_lr):
-            sector_top_frame = ctk.CTkFrame(top_frame, fg_color="transparent")
-            sector_top_frame.pack(side="left", padx=(0 if idx == 0 else 6, 0))
+            cell = ctk.CTkFrame(top_frame, fg_color="transparent")
+            cell.grid(row=0, column=idx, sticky="nsew")
+            # Inner frame centers buttons within the uniform-width cell
+            inner = ctk.CTkFrame(cell, fg_color="transparent")
+            inner.pack(expand=True)
             top_stations = sorted(
                 [s for s in sector["stations"] if s <= half], reverse=True,
             )
             for station in top_stations:
                 key = (sector["name"], station)
-                btn = self._create_station_button(sector_top_frame, key)
+                btn = self._create_station_button(inner, key)
                 btn.pack(side="left", padx=2, pady=2)
 
         # --- pond rectangle ---
         pond_frame = ctk.CTkFrame(self, fg_color="#1a5276", height=80)
         pond_frame.pack(fill="x", padx=10, pady=0)
         pond_frame.pack_propagate(False)
+        for i in range(num_sectors):
+            pond_frame.grid_columnconfigure(i, weight=1, uniform="sector")
+        pond_frame.grid_rowconfigure(0, weight=1)
 
         for idx, sector in enumerate(sectors_lr):
-            if idx > 0:
-                sep = ctk.CTkFrame(pond_frame, width=2, fg_color="#E74C3C")
-                sep.pack(side="left", fill="y")
             sector_excluded = sum(
                 1 for s in sector["stations"]
                 if (sector["name"], s) in self.selected_stations
@@ -108,22 +121,33 @@ class BalanceSectorsDialog(FeederCompDialog):
                 font=("Segoe UI", 14, "bold"),
                 text_color="#FFFFFF",
             )
-            lbl.pack(side="left", expand=True, fill="both")
+            lbl.grid(row=0, column=idx, sticky="nsew")
             self.sector_labels[sector["name"]] = lbl
+
+        # Separators between sectors — use place() with relative coordinates
+        # so they align exactly with the grid column boundaries regardless of DPI
+        for idx in range(1, num_sectors):
+            sep = ctk.CTkFrame(pond_frame, width=2, fg_color="#E74C3C")
+            sep.place(relx=idx / num_sectors, rely=0.0, relheight=1.0, anchor="n")
 
         # --- bottom bank ---
         bottom_frame = ctk.CTkFrame(self, fg_color="transparent")
-        bottom_frame.pack(padx=10, pady=(0, 5))
+        bottom_frame.pack(fill="x", padx=10, pady=(0, 5))
+        for i in range(num_sectors):
+            bottom_frame.grid_columnconfigure(i, weight=1, uniform="sector")
 
         for idx, sector in enumerate(sectors_lr):
-            sector_bot_frame = ctk.CTkFrame(bottom_frame, fg_color="transparent")
-            sector_bot_frame.pack(side="left", padx=(0 if idx == 0 else 6, 0))
+            cell = ctk.CTkFrame(bottom_frame, fg_color="transparent")
+            cell.grid(row=0, column=idx, sticky="nsew")
+            # Inner frame centers buttons within the uniform-width cell
+            inner = ctk.CTkFrame(cell, fg_color="transparent")
+            inner.pack(expand=True)
             bot_stations = sorted(
                 [s for s in sector["stations"] if s > half],
             )
             for station in bot_stations:
                 key = (sector["name"], station)
-                btn = self._create_station_button(sector_bot_frame, key)
+                btn = self._create_station_button(inner, key)
                 btn.pack(side="left", padx=2, pady=2)
 
         # --- counter and action buttons ---

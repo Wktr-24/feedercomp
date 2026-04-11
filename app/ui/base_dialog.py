@@ -48,6 +48,15 @@ class FeederCompDialog(ctk.CTkToplevel):
         self.grab_set()
         self.focus_set()
 
+    def resize_to(self, width: int, height: int) -> None:
+        """Update dialog target dimensions before show_modal() is called.
+
+        Call this after building UI if the required size is only known
+        after widgets are laid out (e.g., dynamic content).
+        """
+        self._dialog_width = width
+        self._dialog_height = height
+
     def _center_on_master(self) -> None:
         master = self._master_ref
         width = self._dialog_width
