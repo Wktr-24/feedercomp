@@ -28,10 +28,16 @@ class BalanceSectorsDialog(FeederCompDialog):
         finally:
             conn.close()
 
-        # Dynamically size dialog to fit actual content (prevents cutoff on DPI-scaled displays)
+        # Dynamically size dialog to fit actual content (prevents cutoff on DPI-scaled displays).
+        # winfo_reqwidth() returns the physical size (already includes CTk widget_scaling
+        # and DPI), but geometry() re-applies window_scaling on top. Divide by the
+        # window scaling factor so we pass logical units to resize_to().
         self.update_idletasks()
-        req_width = max(self._dialog_width, self.winfo_reqwidth() + 40)
-        req_height = max(self._dialog_height, self.winfo_reqheight() + 20)
+        scaling = self._get_window_scaling()
+        logical_req_w = int(self.winfo_reqwidth() / scaling) + 40
+        logical_req_h = int(self.winfo_reqheight() / scaling) + 20
+        req_width = max(self._dialog_width, logical_req_w)
+        req_height = max(self._dialog_height, logical_req_h)
         self.resize_to(req_width, req_height)
 
         self.show_modal()
