@@ -19,3 +19,6 @@ zawody-Wiktor/
 
 # Generated diagrams
 Schemat_*.pdf
+
+# Release artifacts
+FeederComp-*-win.zip
