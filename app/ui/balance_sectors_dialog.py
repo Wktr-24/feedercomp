@@ -11,6 +11,7 @@ from app.services.sector_service import (
     SectorService,
     load_venue_config,
     match_variant_for_selection,
+    reconcile_competitor_sectors,
 )
 from app.ui.base_dialog import FeederCompDialog
 
@@ -373,6 +374,13 @@ class BalanceSectorsDialog(FeederCompDialog):
             )
             return
 
+        # Build the venue-default sector_info (existing overrides reversed)
+        # ONCE and use it for every size computation in this method, so the
+        # popup distribution and the final diff>1 check both base their math
+        # on the same canonical layout regardless of what overrides happened
+        # to be applied previously.
+        default_sector_info = self._default_sector_info_snapshot()
+
         # Detect a known balance variant for the current selection
         # (e.g. Lasomin variant 2: {17, 18} → suggest moving 13 from C to D).
         # Only triggers when the variant defines non-empty sector_overrides.
@@ -389,24 +397,6 @@ class BalanceSectorsDialog(FeederCompDialog):
                 pending_overrides = override_map
             else:
                 sector_order = [s["name"] for s in reversed(self.sector_info)]
-                # Compute "without override" sizes against the *venue default* layout,
-                # not the current sector_info (which may have prior overrides applied).
-                default_sector_info = [
-                    {"name": s["name"], "stations": list(s["stations"])}
-                    for s in self.sector_info
-                ]
-                for station, target in self._existing_overrides.items():
-                    # Reverse the existing override to get the venue-default layout.
-                    for sec in default_sector_info:
-                        if station in sec["stations"]:
-                            sec["stations"].remove(station)
-                            break
-                    canonical = self._venue_default_sector(station)
-                    for sec in default_sector_info:
-                        if sec["name"] == canonical:
-                            sec["stations"].append(station)
-                            sec["stations"].sort()
-                            break
                 sizes_with = compute_resulting_sizes(
                     default_sector_info, excluded_stations, override_map,
                 )
@@ -431,7 +421,7 @@ class BalanceSectorsDialog(FeederCompDialog):
 
         sizes = list(
             compute_resulting_sizes(
-                self.sector_info, excluded_stations, pending_overrides or None,
+                default_sector_info, excluded_stations, pending_overrides or None,
             ).values()
         )
         diff = max(sizes) - min(sizes) if sizes else 0
@@ -454,6 +444,7 @@ class BalanceSectorsDialog(FeederCompDialog):
             competition_sector_overrides_repo.set_overrides(
                 conn, self.competition_id, pending_overrides,
             )
+            self._reconcile_competitor_sectors(conn)
             conn.commit()
         finally:
             conn.close()
@@ -473,19 +464,48 @@ class BalanceSectorsDialog(FeederCompDialog):
                 return sector_name
         return "?"
 
-    def _compute_resulting_sizes(self, checked: list[tuple[str, int]]) -> dict[str, int]:
-        excluded_stations = {station for _, station in checked}
-        return compute_resulting_sizes(self.sector_info, excluded_stations)
+    def _default_sector_info_snapshot(self) -> list[dict]:
+        """Return a fresh copy of sector_info with self._existing_overrides
+        reversed — i.e. the venue's canonical layout for this competition.
+
+        Used for size computations that must be invariant to whatever
+        overrides happen to be currently saved (so the popup display and
+        the final diff>1 check don't double-apply prior overrides).
+        """
+        snapshot = [
+            {"name": s["name"], "stations": list(s["stations"])}
+            for s in self.sector_info
+        ]
+        for station in self._existing_overrides:
+            for sec in snapshot:
+                if station in sec["stations"]:
+                    sec["stations"].remove(station)
+                    break
+            canonical = self._venue_default_sector(station)
+            for sec in snapshot:
+                if sec["name"] == canonical:
+                    sec["stations"].append(station)
+                    sec["stations"].sort()
+                    break
+        return snapshot
+
+    def _reconcile_competitor_sectors(self, conn) -> None:
+        reconcile_competitor_sectors(
+            conn, self.competition_id, self.venue_id, self.sector_service,
+        )
 
     def _restore_all(self):
         # "Przywróć wszystkie" must reset the competition's balancing state
         # in full — both station exclusions and any sector overrides applied
         # (e.g. Lasomin variant 2's 13 → D shift). Otherwise the dialog reopens
         # with stale overrides while the user expects a clean slate.
+        # Reconcile competitor.sector_name for any already-assigned stations
+        # so scoring doesn't keep using a sector that no longer applies.
         conn = self.app.get_connection()
         try:
             excluded_station_repo.clear_excluded(conn, self.competition_id)
             competition_sector_overrides_repo.clear_overrides(conn, self.competition_id)
+            self._reconcile_competitor_sectors(conn)
             conn.commit()
         finally:
             conn.close()

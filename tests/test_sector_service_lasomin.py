@@ -5,6 +5,7 @@ from app.services.sector_service import (
     SectorService,
     get_balance_variant,
     match_variant_for_selection,
+    reconcile_competitor_sectors,
 )
 
 
@@ -216,6 +217,99 @@ class TestGetBalanceVariant:
 
     def test_unknown_venue_returns_none(self):
         assert get_balance_variant("Nieistniejące Łowisko", 1) is None
+
+
+class TestReconcileCompetitorSectors:
+    """Regression tests for the sector divergence flagged by architect/code review:
+    after overrides change, already-assigned competitors must be re-stamped with
+    the current effective sector_name so ranking uses the right sector."""
+
+    def test_assign_then_add_override_reconciles_to_overridden_sector(
+        self, db, service, lasomin_venue_id, lasomin_comp,
+    ):
+        cid = _add_competitor(db, lasomin_comp)
+        competitor_repo.update_presence(db, cid, True)
+        db.commit()
+
+        # Assign first WITHOUT override → station 13 lands in C (venue default).
+        service.assign_station(db, cid, 13, lasomin_venue_id, lasomin_comp)
+        db.commit()
+        assert competitor_repo.get_by_id(db, cid).sector_name == "C"
+
+        # Now add override (Lasomin variant 2) and reconcile.
+        competition_sector_overrides_repo.set_overrides(db, lasomin_comp, {13: "D"})
+        db.commit()
+        reconcile_competitor_sectors(db, lasomin_comp, lasomin_venue_id, service)
+        db.commit()
+
+        # Stored sector_name should track the override.
+        assert competitor_repo.get_by_id(db, cid).sector_name == "D"
+
+    def test_assign_with_override_then_clear_reconciles_to_default(
+        self, db, service, lasomin_venue_id, lasomin_comp,
+    ):
+        cid = _add_competitor(db, lasomin_comp)
+        competitor_repo.update_presence(db, cid, True)
+        competition_sector_overrides_repo.set_overrides(db, lasomin_comp, {13: "D"})
+        db.commit()
+
+        service.assign_station(db, cid, 13, lasomin_venue_id, lasomin_comp)
+        db.commit()
+        assert competitor_repo.get_by_id(db, cid).sector_name == "D"
+
+        # Clear override (e.g. user clicked "Przywróć wszystkie") and reconcile.
+        competition_sector_overrides_repo.clear_overrides(db, lasomin_comp)
+        db.commit()
+        reconcile_competitor_sectors(db, lasomin_comp, lasomin_venue_id, service)
+        db.commit()
+
+        assert competitor_repo.get_by_id(db, cid).sector_name == "C"
+
+    def test_reconcile_is_noop_for_unassigned_competitors(
+        self, db, service, lasomin_venue_id, lasomin_comp,
+    ):
+        cid = _add_competitor(db, lasomin_comp)
+        competitor_repo.update_presence(db, cid, True)
+        db.commit()
+
+        reconcile_competitor_sectors(db, lasomin_comp, lasomin_venue_id, service)
+        db.commit()
+
+        c = competitor_repo.get_by_id(db, cid)
+        assert c.station_number is None
+        assert c.sector_name is None
+
+    def test_reconcile_does_not_touch_already_correct_assignments(
+        self, db, service, lasomin_venue_id, lasomin_comp,
+    ):
+        cid = _add_competitor(db, lasomin_comp)
+        competitor_repo.update_presence(db, cid, True)
+        db.commit()
+
+        service.assign_station(db, cid, 22, lasomin_venue_id, lasomin_comp)
+        db.commit()
+        assert competitor_repo.get_by_id(db, cid).sector_name == "D"
+
+        reconcile_competitor_sectors(db, lasomin_comp, lasomin_venue_id, service)
+        db.commit()
+
+        # Station 22 has no override; should remain D.
+        assert competitor_repo.get_by_id(db, cid).sector_name == "D"
+
+    def test_reconcile_default_service_when_none_passed(
+        self, db, lasomin_venue_id, lasomin_comp,
+    ):
+        # Smoke test: reconcile should construct its own SectorService when not given.
+        cid = _add_competitor(db, lasomin_comp)
+        competitor_repo.update_presence(db, cid, True)
+        SectorService().assign_station(db, cid, 13, lasomin_venue_id, lasomin_comp)
+        competition_sector_overrides_repo.set_overrides(db, lasomin_comp, {13: "D"})
+        db.commit()
+
+        reconcile_competitor_sectors(db, lasomin_comp, lasomin_venue_id)
+        db.commit()
+
+        assert competitor_repo.get_by_id(db, cid).sector_name == "D"
 
 
 class TestMatchVariantForSelection:

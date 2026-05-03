@@ -51,6 +51,34 @@ def match_variant_for_selection(
     return None
 
 
+def reconcile_competitor_sectors(
+    conn: sqlite3.Connection,
+    competition_id: int,
+    venue_id: int,
+    service: "SectorService | None" = None,
+) -> None:
+    """Re-derive sector_name for every already-assigned competitor in the
+    competition based on current per-competition overrides + venue defaults.
+
+    Call after mutating excluded_stations or competition_sector_overrides so
+    stored ``competitors.sector_name`` doesn't drift from what the override
+    table now says (Lasomin scoring divergence: same station can resolve to
+    a different sector after a re-balance).
+    """
+    if service is None:
+        service = SectorService()
+    for c in competitor_repo.get_all(conn, competition_id):
+        if c.station_number is None:
+            continue
+        new_sector = service.get_sector_for_station(
+            conn, venue_id, c.station_number, competition_id,
+        )
+        if new_sector and new_sector != c.sector_name:
+            competitor_repo.update_station(
+                conn, c.id, c.station_number, new_sector,
+            )
+
+
 class SectorService:
     def get_sector_for_station(
         self,
