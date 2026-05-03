@@ -2,9 +2,45 @@ from tkinter import messagebox
 
 import customtkinter as ctk
 
-from app.repositories import excluded_station_repo, venue_repo
-from app.services.sector_service import SectorService, load_venue_config
+from app.repositories import (
+    competition_sector_overrides_repo,
+    excluded_station_repo,
+    venue_repo,
+)
+from app.services.sector_service import (
+    SectorService,
+    load_venue_config,
+    match_variant_for_selection,
+)
 from app.ui.base_dialog import FeederCompDialog
+
+
+def compute_resulting_sizes(
+    sector_info: list[dict],
+    excluded_stations: set[int],
+    overrides: dict[int, str] | None = None,
+) -> dict[str, int]:
+    """Compute the per-sector competitor count after exclusions and overrides.
+
+    `excluded_stations` is the set of station numbers removed from the pond.
+    `overrides` reassigns specific stations to a different sector (e.g. Lasomin
+    variant 2 moves station 13 from C to D). Returns {sector_name: count}.
+    """
+    overrides = overrides or {}
+    sizes: dict[str, int] = {sector["name"]: 0 for sector in sector_info}
+    for sector in sector_info:
+        for station in sector["stations"]:
+            if station in excluded_stations:
+                continue
+            target = overrides.get(station, sector["name"])
+            if target in sizes:
+                sizes[target] += 1
+    return sizes
+
+
+def _format_distribution(sizes: dict[str, int], sector_order: list[str]) -> str:
+    """Format sector sizes as compact 'D=8 C=8 B=8 A=8' string in given order."""
+    return " ".join(f"{name}={sizes.get(name, 0)}" for name in sector_order)
 
 
 def split_stations_to_banks(
@@ -87,12 +123,31 @@ class BalanceSectorsDialog(FeederCompDialog):
         venue_cfg = load_venue_config(self.venue_name)
         self._banks = venue_cfg.get("banks") if venue_cfg else None
 
+        # Persisted overrides from a previous "Wyrównanie sektorów" save
+        # (e.g. Lasomin variant 2: station 13 reassigned C → D for this competition).
+        self._existing_overrides = competition_sector_overrides_repo.get_overrides(
+            conn, self.competition_id,
+        )
+
         self.total_stations = len(all_sectors)
         self.total_to_exclude = max(0, self.total_stations - self.present_count)
         self.sector_info: list[dict] = []
         for name in sector_names:
             stations = sorted(s.station_number for s in all_sectors if s.sector_name == name)
             self.sector_info.append({"name": name, "stations": stations})
+
+        # Apply existing overrides to sector_info so the dialog renders the
+        # competition's effective layout (moved stations, balanced sector sizes).
+        for station, target_sector in self._existing_overrides.items():
+            for sec in self.sector_info:
+                if station in sec["stations"]:
+                    sec["stations"].remove(station)
+                    break
+            for sec in self.sector_info:
+                if sec["name"] == target_sector:
+                    sec["stations"].append(station)
+                    sec["stations"].sort()
+                    break
 
         self.selected_stations = set(already_excluded_set)
         self.original_selection = set(self.selected_stations)
@@ -294,7 +349,67 @@ class BalanceSectorsDialog(FeederCompDialog):
             )
             return
 
-        sizes = list(self._compute_resulting_sizes(checked).values())
+        # Detect a known balance variant for the current selection
+        # (e.g. Lasomin variant 2: {17, 18} → suggest moving 13 from C to D).
+        # Only triggers when the variant defines non-empty sector_overrides.
+        excluded_stations = {station for _, station in checked}
+        variant = match_variant_for_selection(self.venue_name, excluded_stations)
+        pending_overrides: dict[int, str] = {}
+        if variant and variant.get("sector_overrides"):
+            override_map = {
+                int(s): sec for s, sec in variant["sector_overrides"].items()
+            }
+            if self._existing_overrides == override_map:
+                # Same selection + same variant already saved before — keep silently,
+                # don't pester the user with the popup on every confirm.
+                pending_overrides = override_map
+            else:
+                sector_order = [s["name"] for s in reversed(self.sector_info)]
+                # Compute "without override" sizes against the *venue default* layout,
+                # not the current sector_info (which may have prior overrides applied).
+                default_sector_info = [
+                    {"name": s["name"], "stations": list(s["stations"])}
+                    for s in self.sector_info
+                ]
+                for station, target in self._existing_overrides.items():
+                    # Reverse the existing override to get the venue-default layout.
+                    for sec in default_sector_info:
+                        if station in sec["stations"]:
+                            sec["stations"].remove(station)
+                            break
+                    canonical = self._venue_default_sector(station)
+                    for sec in default_sector_info:
+                        if sec["name"] == canonical:
+                            sec["stations"].append(station)
+                            sec["stations"].sort()
+                            break
+                sizes_with = compute_resulting_sizes(
+                    default_sector_info, excluded_stations, override_map,
+                )
+                sizes_without = compute_resulting_sizes(
+                    default_sector_info, excluded_stations,
+                )
+                moves = ", ".join(
+                    f"stanowisko {station} z sektora "
+                    f"{self._venue_default_sector(station)} do sektora {new_sector}"
+                    for station, new_sector in override_map.items()
+                )
+                msg = (
+                    f"Zaznaczenie pasuje do wzorca wyrównywania Lasomin.\n\n"
+                    f"Sugerowane przesunięcie: {moves}.\n\n"
+                    f"Rozkład sektorów:\n"
+                    f"  z przesunięciem: {_format_distribution(sizes_with, sector_order)}\n"
+                    f"  bez przesunięcia: {_format_distribution(sizes_without, sector_order)}\n\n"
+                    f"Zastosować przesunięcie?"
+                )
+                if messagebox.askyesno("Wariant Lasomin", msg, parent=self):
+                    pending_overrides = override_map
+
+        sizes = list(
+            compute_resulting_sizes(
+                self.sector_info, excluded_stations, pending_overrides or None,
+            ).values()
+        )
         diff = max(sizes) - min(sizes) if sizes else 0
         if diff > 1:
             msg = (
@@ -312,6 +427,9 @@ class BalanceSectorsDialog(FeederCompDialog):
                     conn, self.competition_id, self.venue_id,
                     station_number, sector_name,
                 )
+            competition_sector_overrides_repo.set_overrides(
+                conn, self.competition_id, pending_overrides,
+            )
             conn.commit()
         finally:
             conn.close()
@@ -320,19 +438,30 @@ class BalanceSectorsDialog(FeederCompDialog):
             self.on_confirm()
         self.destroy()
 
+    def _venue_default_sector(self, station: int) -> str:
+        """Look up the venue's canonical sector for a station, ignoring any
+        overrides currently applied to self.sector_info."""
+        cfg = load_venue_config(self.venue_name)
+        if not cfg:
+            return "?"
+        for sector_name, stations in cfg.get("sectors", {}).items():
+            if station in stations:
+                return sector_name
+        return "?"
+
     def _compute_resulting_sizes(self, checked: list[tuple[str, int]]) -> dict[str, int]:
-        checked_set = set(checked)
-        sizes: dict[str, int] = {}
-        for sector in self.sector_info:
-            sizes[sector["name"]] = sum(
-                1 for s in sector["stations"] if (sector["name"], s) not in checked_set
-            )
-        return sizes
+        excluded_stations = {station for _, station in checked}
+        return compute_resulting_sizes(self.sector_info, excluded_stations)
 
     def _restore_all(self):
+        # "Przywróć wszystkie" must reset the competition's balancing state
+        # in full — both station exclusions and any sector overrides applied
+        # (e.g. Lasomin variant 2's 13 → D shift). Otherwise the dialog reopens
+        # with stale overrides while the user expects a clean slate.
         conn = self.app.get_connection()
         try:
             excluded_station_repo.clear_excluded(conn, self.competition_id)
+            competition_sector_overrides_repo.clear_overrides(conn, self.competition_id)
             conn.commit()
         finally:
             conn.close()

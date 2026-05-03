@@ -1,5 +1,87 @@
 from app.services.sector_service import load_venue_config
-from app.ui.balance_sectors_dialog import split_stations_to_banks
+from app.ui.balance_sectors_dialog import (
+    _format_distribution,
+    compute_resulting_sizes,
+    split_stations_to_banks,
+)
+
+
+LASOMIN_SECTOR_INFO = [
+    {"name": "A", "stations": [1, 2, 3, 4, 31, 32, 33, 34]},
+    {"name": "B", "stations": [5, 6, 7, 8, 27, 28, 29, 30]},
+    {"name": "C", "stations": [9, 10, 11, 12, 13, 23, 24, 25, 26]},
+    {"name": "D", "stations": [14, 15, 16, 17, 18, 19, 20, 21, 22]},
+]
+
+
+class TestComputeResultingSizesLasomin:
+    def test_variant_0_no_exclusions(self):
+        sizes = compute_resulting_sizes(LASOMIN_SECTOR_INFO, set())
+        assert sizes == {"A": 8, "B": 8, "C": 9, "D": 9}
+
+    def test_variant_1_exclude_18_no_overrides(self):
+        sizes = compute_resulting_sizes(LASOMIN_SECTOR_INFO, {18})
+        assert sizes == {"A": 8, "B": 8, "C": 9, "D": 8}
+
+    def test_variant_2_without_override_gives_unbalanced(self):
+        # 17, 18 excluded but no override → D shrinks to 7, C still 9
+        sizes = compute_resulting_sizes(LASOMIN_SECTOR_INFO, {17, 18})
+        assert sizes == {"A": 8, "B": 8, "C": 9, "D": 7}
+
+    def test_variant_2_with_override_13_to_D_balances_to_8888(self):
+        sizes = compute_resulting_sizes(
+            LASOMIN_SECTOR_INFO, {17, 18}, {13: "D"},
+        )
+        assert sizes == {"A": 8, "B": 8, "C": 8, "D": 8}
+
+    def test_variant_3_without_override(self):
+        # 17, 18, 1 excluded but no override
+        sizes = compute_resulting_sizes(LASOMIN_SECTOR_INFO, {17, 18, 1})
+        assert sizes == {"A": 7, "B": 8, "C": 9, "D": 7}
+
+    def test_variant_3_with_override_13_to_D(self):
+        sizes = compute_resulting_sizes(
+            LASOMIN_SECTOR_INFO, {17, 18, 1}, {13: "D"},
+        )
+        assert sizes == {"A": 7, "B": 8, "C": 8, "D": 8}
+
+    def test_override_to_unknown_sector_is_ignored(self):
+        # Defensive: if overrides reference a sector that doesn't exist,
+        # the station is silently dropped (count goes nowhere).
+        sizes = compute_resulting_sizes(
+            LASOMIN_SECTOR_INFO, set(), {13: "ZZ"},
+        )
+        # Station 13 was in C; without it C drops by 1; ZZ doesn't exist so it's lost.
+        assert sizes == {"A": 8, "B": 8, "C": 8, "D": 9}
+
+
+STAWY_SECTOR_INFO = [
+    {"name": "A", "stations": [1, 2, 3, 4, 5, 46, 47, 48, 49, 50]},
+    {"name": "B", "stations": [6, 7, 8, 9, 10, 41, 42, 43, 44, 45]},
+    {"name": "C", "stations": [11, 12, 13, 14, 15, 36, 37, 38, 39, 40]},
+    {"name": "D", "stations": [16, 17, 18, 19, 20, 31, 32, 33, 34, 35]},
+    {"name": "E", "stations": [21, 22, 23, 24, 25, 26, 27, 28, 29, 30]},
+]
+
+
+class TestComputeResultingSizesStawyRegression:
+    def test_full_house(self):
+        sizes = compute_resulting_sizes(STAWY_SECTOR_INFO, set())
+        assert sizes == {"A": 10, "B": 10, "C": 10, "D": 10, "E": 10}
+
+    def test_two_excluded_one_per_sector_no_overrides(self):
+        sizes = compute_resulting_sizes(STAWY_SECTOR_INFO, {1, 30})
+        assert sizes == {"A": 9, "B": 10, "C": 10, "D": 10, "E": 9}
+
+
+class TestFormatDistribution:
+    def test_lasomin_order_d_to_a(self):
+        sizes = {"A": 8, "B": 8, "C": 8, "D": 8}
+        assert _format_distribution(sizes, ["D", "C", "B", "A"]) == "D=8 C=8 B=8 A=8"
+
+    def test_missing_sector_renders_as_zero(self):
+        sizes = {"A": 7, "B": 8}
+        assert _format_distribution(sizes, ["D", "C", "B", "A"]) == "D=0 C=0 B=8 A=7"
 
 
 class TestSplitStationsToBanksLasomin:
