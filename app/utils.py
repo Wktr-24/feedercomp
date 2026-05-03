@@ -3,32 +3,43 @@ import re
 
 from app.config import get_bundle_dir
 
+# How long after an <Unmap> we treat a <FocusIn> as a Win+D side-effect
+# instead of a user-initiated restore. 1s is comfortably above the WM
+# transition latency and well below human click-to-restore reaction time.
+# Workaround for Tk bug ed6c3a787d / CPython #114422.
+UNMAP_GRACE_SECONDS = 1.0
+
 
 def set_window_icon(window) -> None:
     """Set the Feederland icon on a Tk window (root or Toplevel).
 
     Windows-only (uses .ico). No-op on other platforms or if icon missing.
 
-    CTkToplevel schedules its own ``self.after(200, self.iconbitmap(...))``
-    during ``__init__``, which overwrites any icon set synchronously. To beat
-    it we re-apply the icon with a longer delay, so our call runs after CTk's.
+    CTkToplevel.__init__ schedules TWO ``after(200, ...)`` callbacks that
+    would overwrite our icon:
+      - One calls ``_windows_set_titlebar_icon`` and is gated by the
+        ``_iconbitmap_method_called`` flag (we set it here).
+      - The other is an unconditional lambda calling ``self.iconbitmap(<CTk
+        default>)`` (ctk_toplevel.py:45). It bypasses ``wm_iconbitmap``
+        entirely. ``FeederCompDialog`` therefore overrides ``iconbitmap``
+        and consults a per-window ``_user_icon_set`` flag that we set here
+        — late CTk calls are then no-ops.
+
+    Avoiding our previous ``after(250)`` re-apply also keeps Win32 from
+    rebuilding the toplevel frame after the transient owner-chain has been
+    wired up, which used to leave the root window un-restorable from the
+    taskbar after Win+D.
     """
     if os.name != 'nt':
         return
     icon_path = get_bundle_dir() / "assets" / "feederland-favicon.ico"
     if not icon_path.exists():
         return
-    icon_str = str(icon_path)
-
-    def _apply():
-        try:
-            window.wm_iconbitmap(icon_str)
-        except Exception:
-            pass
-
-    _apply()
     try:
-        window.after(250, _apply)
+        window.wm_iconbitmap(str(icon_path))
+        if hasattr(window, '_iconbitmap_method_called'):
+            window._iconbitmap_method_called = True
+        window._user_icon_set = True
     except Exception:
         pass
 
