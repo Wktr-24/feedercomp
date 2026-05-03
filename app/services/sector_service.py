@@ -2,7 +2,7 @@ import json
 import sqlite3
 
 from app.config import get_bundle_dir
-from app.repositories import competitor_repo, venue_repo
+from app.repositories import competition_sector_overrides_repo, competitor_repo, venue_repo
 from app.repositories import excluded_station_repo
 
 _VENUE_CONFIG_CACHE: dict[str, dict] = {}
@@ -22,12 +22,57 @@ def load_venue_config(venue_name: str) -> dict | None:
     return _VENUE_CONFIG_CACHE.get(venue_name)
 
 
+def get_balance_variant(venue_name: str, num_missing: int) -> dict | None:
+    """Return the balance variant config for the given missing-competitor count, or None."""
+    cfg = load_venue_config(venue_name)
+    if not cfg:
+        return None
+    return cfg.get("balance_variants", {}).get(str(num_missing))
+
+
+def match_variant_for_selection(
+    venue_name: str, selected_stations: set[int],
+) -> dict | None:
+    """Return the variant whose `excluded` set exactly matches the user's selection
+    AND has a non-empty `sector_overrides` map. None otherwise.
+
+    Variants without overrides (e.g. Lasomin variant 1, which only excludes station 18)
+    are skipped — they don't trigger any UI prompt because nothing needs to be applied
+    beyond the already-recorded exclusions.
+    """
+    cfg = load_venue_config(venue_name)
+    if not cfg:
+        return None
+    for variant in cfg.get("balance_variants", {}).values():
+        if not variant.get("sector_overrides"):
+            continue
+        if set(variant.get("excluded", [])) == selected_stations:
+            return variant
+    return None
+
+
 class SectorService:
-    def get_sector_for_station(self, conn: sqlite3.Connection, venue_id: int, station_number: int) -> str | None:
+    def get_sector_for_station(
+        self,
+        conn: sqlite3.Connection,
+        venue_id: int,
+        station_number: int,
+        competition_id: int | None = None,
+    ) -> str | None:
+        # Per-competition override wins (e.g. Lasomin variant 2 moves station 13
+        # from C to D for that competition only). Fall back to the venue default.
+        if competition_id is not None:
+            override = competition_sector_overrides_repo.get_override(
+                conn, competition_id, station_number,
+            )
+            if override is not None:
+                return override
         return venue_repo.get_sector_for_station(conn, venue_id, station_number)
 
     def assign_station(self, conn: sqlite3.Connection, competitor_id: int, station_number: int, venue_id: int, competition_id: int | None = None):
-        sector_name = venue_repo.get_sector_for_station(conn, venue_id, station_number)
+        sector_name = self.get_sector_for_station(
+            conn, venue_id, station_number, competition_id,
+        )
         if sector_name is None:
             venue = venue_repo.get_by_id(conn, venue_id)
             total = venue.total_stations if venue else "?"
