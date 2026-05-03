@@ -43,6 +43,26 @@ def _format_distribution(sizes: dict[str, int], sector_order: list[str]) -> str:
     return " ".join(f"{name}={sizes.get(name, 0)}" for name in sector_order)
 
 
+def compute_separator_positions(sector_sizes_lr: list[int]) -> list[float]:
+    """Return separator x-positions (as fractions of total width) for sectors
+    rendered left-to-right with the given physical sizes.
+
+    Examples:
+      [9, 9, 8, 8]   → [9/34, 18/34, 26/34]    (Lasomin full house)
+      [10, 8, 8, 8]  → [10/34, 18/34, 26/34]   (Lasomin after variant 2)
+      [10, 10, 10, 10, 10] → [0.2, 0.4, 0.6, 0.8] (Stawy — unchanged from equal)
+    """
+    total = sum(sector_sizes_lr)
+    if total == 0 or len(sector_sizes_lr) <= 1:
+        return []
+    positions = []
+    cumulative = 0
+    for size in sector_sizes_lr[:-1]:
+        cumulative += size
+        positions.append(cumulative / total)
+    return positions
+
+
 def split_stations_to_banks(
     sector_stations: list[int],
     banks: dict | None,
@@ -161,6 +181,11 @@ class BalanceSectorsDialog(FeederCompDialog):
             )
             for sector in self.sector_info
         }
+        # Proportional column widths so a sector with more stations (e.g. D after
+        # Lasomin variant 2: 10 stations vs 8 elsewhere) renders wider than its
+        # neighbours and the pond separators line up with sector boundaries.
+        sector_weights = [len(s["stations"]) for s in sectors_lr]
+        separator_positions = compute_separator_positions(sector_weights)
 
         header = ctk.CTkLabel(
             self,
@@ -171,13 +196,11 @@ class BalanceSectorsDialog(FeederCompDialog):
         )
         header.pack(padx=10, pady=(10, 5))
 
-        num_sectors = len(sectors_lr)
-
         # --- top bank ---
         top_frame = ctk.CTkFrame(self, fg_color="transparent")
         top_frame.pack(fill="x", padx=10, pady=(5, 0))
-        for i in range(num_sectors):
-            top_frame.grid_columnconfigure(i, weight=1, uniform="sector")
+        for i, weight in enumerate(sector_weights):
+            top_frame.grid_columnconfigure(i, weight=weight)
 
         for idx, sector in enumerate(sectors_lr):
             cell = ctk.CTkFrame(top_frame, fg_color="transparent")
@@ -195,8 +218,8 @@ class BalanceSectorsDialog(FeederCompDialog):
         pond_frame = ctk.CTkFrame(self, fg_color="#1a5276", height=80)
         pond_frame.pack(fill="x", padx=10, pady=0)
         pond_frame.pack_propagate(False)
-        for i in range(num_sectors):
-            pond_frame.grid_columnconfigure(i, weight=1, uniform="sector")
+        for i, weight in enumerate(sector_weights):
+            pond_frame.grid_columnconfigure(i, weight=weight)
         pond_frame.grid_rowconfigure(0, weight=1)
 
         for idx, sector in enumerate(sectors_lr):
@@ -214,17 +237,18 @@ class BalanceSectorsDialog(FeederCompDialog):
             lbl.grid(row=0, column=idx, sticky="nsew")
             self.sector_labels[sector["name"]] = lbl
 
-        # Separators between sectors — use place() with relative coordinates
-        # so they align exactly with the grid column boundaries regardless of DPI
-        for idx in range(1, num_sectors):
+        # Separators between sectors — placed proportionally to actual sector
+        # sizes so they align with grid column boundaries (which now use
+        # weight=len(stations) instead of equal weights).
+        for relx in separator_positions:
             sep = ctk.CTkFrame(pond_frame, width=2, fg_color="#E74C3C")
-            sep.place(relx=idx / num_sectors, rely=0.0, relheight=1.0, anchor="n")
+            sep.place(relx=relx, rely=0.0, relheight=1.0, anchor="n")
 
         # --- bottom bank ---
         bottom_frame = ctk.CTkFrame(self, fg_color="transparent")
         bottom_frame.pack(fill="x", padx=10, pady=(0, 5))
-        for i in range(num_sectors):
-            bottom_frame.grid_columnconfigure(i, weight=1, uniform="sector")
+        for i, weight in enumerate(sector_weights):
+            bottom_frame.grid_columnconfigure(i, weight=weight)
 
         for idx, sector in enumerate(sectors_lr):
             cell = ctk.CTkFrame(bottom_frame, fg_color="transparent")
