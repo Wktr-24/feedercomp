@@ -55,6 +55,14 @@ CREATE TABLE IF NOT EXISTS excluded_stations (
     sector_name TEXT NOT NULL,
     UNIQUE(competition_id, station_number)
 );
+
+CREATE TABLE IF NOT EXISTS competition_sector_overrides (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    competition_id INTEGER NOT NULL REFERENCES competitions(id) ON DELETE CASCADE,
+    station_number INTEGER NOT NULL,
+    sector_name TEXT NOT NULL,
+    UNIQUE(competition_id, station_number)
+);
 """
 
 _SEED_DATA_PATH = get_bundle_dir() / "seed_data" / "venues.json"
@@ -94,10 +102,39 @@ def _seed_default_venues(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def _migrate_lasomin_sectors(conn: sqlite3.Connection) -> None:
+    # Migration: 2026-05 Lasomin sector seed.
+    # Lasomin shipped in earlier versions with empty sectors; this fills them
+    # in for production DBs that were created before the seed JSON was updated.
+    # Idempotent — short-circuits when Lasomin already has any sectors.
+    row = conn.execute("SELECT id FROM venues WHERE name = 'Lasomin'").fetchone()
+    if not row:
+        return
+    venue_id = row["id"]
+    has_sectors = conn.execute(
+        "SELECT COUNT(*) FROM venue_sectors WHERE venue_id = ?", (venue_id,)
+    ).fetchone()[0]
+    if has_sectors > 0:
+        return
+    with open(_SEED_DATA_PATH) as f:
+        data = json.load(f)
+    lasomin = next((v for v in data["venues"] if v["name"] == "Lasomin"), None)
+    if not lasomin:
+        return
+    for sector_name, stations in lasomin.get("sectors", {}).items():
+        for station in stations:
+            conn.execute(
+                "INSERT INTO venue_sectors (venue_id, sector_name, station_number) VALUES (?, ?, ?)",
+                (venue_id, sector_name, station),
+            )
+    conn.commit()
+
+
 def init_db_with_connection(conn: sqlite3.Connection) -> None:
     conn.execute("PRAGMA foreign_keys = ON")
     _create_tables(conn)
     _seed_default_venues(conn)
+    _migrate_lasomin_sectors(conn)
 
 
 def init_db(db_path: Path) -> None:

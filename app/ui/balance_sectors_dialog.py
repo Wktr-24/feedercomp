@@ -3,8 +3,30 @@ from tkinter import messagebox
 import customtkinter as ctk
 
 from app.repositories import excluded_station_repo, venue_repo
-from app.services.sector_service import SectorService
+from app.services.sector_service import SectorService, load_venue_config
 from app.ui.base_dialog import FeederCompDialog
+
+
+def split_stations_to_banks(
+    sector_stations: list[int],
+    banks: dict | None,
+    total_stations: int,
+) -> tuple[list[int], list[int]]:
+    """Split a sector's stations into (top, bottom) in left-to-right render order.
+
+    With explicit `banks` config (per-venue): use the ordered lists in
+    banks["top"] / banks["bottom"]. Without (e.g. Stawy): fall back to the
+    half-split heuristic — low numbers on top (descending), high on bottom (ascending).
+    """
+    sector_set = set(sector_stations)
+    if banks:
+        top = [s for s in banks["top"] if s in sector_set]
+        bot = [s for s in banks["bottom"] if s in sector_set]
+        return top, bot
+    half = total_stations // 2
+    top = sorted([s for s in sector_stations if s <= half], reverse=True)
+    bot = sorted([s for s in sector_stations if s > half])
+    return top, bot
 
 
 class BalanceSectorsDialog(FeederCompDialog):
@@ -60,6 +82,10 @@ class BalanceSectorsDialog(FeederCompDialog):
 
         all_sectors = venue_repo.get_sectors(conn, self.venue_id)
         sector_names = venue_repo.get_sector_names(conn, self.venue_id)
+        venue = venue_repo.get_by_id(conn, self.venue_id)
+        self.venue_name = venue.name if venue else ""
+        venue_cfg = load_venue_config(self.venue_name)
+        self._banks = venue_cfg.get("banks") if venue_cfg else None
 
         self.total_stations = len(all_sectors)
         self.total_to_exclude = max(0, self.total_stations - self.present_count)
@@ -73,8 +99,13 @@ class BalanceSectorsDialog(FeederCompDialog):
 
     def _build_ui(self):
         self.sector_labels: dict[str, ctk.CTkLabel] = {}
-        half = self.total_stations // 2
         sectors_lr = list(reversed(self.sector_info))
+        sector_banks = {
+            sector["name"]: split_stations_to_banks(
+                sector["stations"], self._banks, self.total_stations,
+            )
+            for sector in self.sector_info
+        }
 
         header = ctk.CTkLabel(
             self,
@@ -99,9 +130,7 @@ class BalanceSectorsDialog(FeederCompDialog):
             # Inner frame centers buttons within the uniform-width cell
             inner = ctk.CTkFrame(cell, fg_color="transparent")
             inner.pack(expand=True)
-            top_stations = sorted(
-                [s for s in sector["stations"] if s <= half], reverse=True,
-            )
+            top_stations, _ = sector_banks[sector["name"]]
             for station in top_stations:
                 key = (sector["name"], station)
                 btn = self._create_station_button(inner, key)
@@ -148,9 +177,7 @@ class BalanceSectorsDialog(FeederCompDialog):
             # Inner frame centers buttons within the uniform-width cell
             inner = ctk.CTkFrame(cell, fg_color="transparent")
             inner.pack(expand=True)
-            bot_stations = sorted(
-                [s for s in sector["stations"] if s > half],
-            )
+            _, bot_stations = sector_banks[sector["name"]]
             for station in bot_stations:
                 key = (sector["name"], station)
                 btn = self._create_station_button(inner, key)

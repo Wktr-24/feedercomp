@@ -1,7 +1,25 @@
+import json
 import sqlite3
 
+from app.config import get_bundle_dir
 from app.repositories import competitor_repo, venue_repo
 from app.repositories import excluded_station_repo
+
+_VENUE_CONFIG_CACHE: dict[str, dict] = {}
+
+
+def load_venue_config(venue_name: str) -> dict | None:
+    """Return the raw venue dict from seed_data/venues.json, or None if not found.
+
+    Cached after first read. PyInstaller-safe via get_bundle_dir().
+    """
+    if not _VENUE_CONFIG_CACHE:
+        path = get_bundle_dir() / "seed_data" / "venues.json"
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        for v in data["venues"]:
+            _VENUE_CONFIG_CACHE[v["name"]] = v
+    return _VENUE_CONFIG_CACHE.get(venue_name)
 
 
 class SectorService:
