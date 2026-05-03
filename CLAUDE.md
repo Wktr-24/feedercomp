@@ -76,4 +76,4 @@ build.bat
 - Obsługa finału dwudniowego (odroczone — brak informacji o regułach)
 - Testowanie GUI na Windows (kod pisany na Linux, UI nietestowane wizualnie)
 - Budowanie i weryfikacja .exe na Windows
-- Konfiguracja sektorów Lasomina (brak danych — venue istnieje, sektory puste)
+- Implementacja Lasomina — spec gotowa w `wymagania-lasomin.md` (sektory + nowa reguła wyrównywania z przesuwaniem granicy C/D); implementacja TBD
