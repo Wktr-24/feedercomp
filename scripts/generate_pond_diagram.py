@@ -83,8 +83,20 @@ def load_venue(venue_name: str) -> dict:
     )
 
 
-def split_top_bottom(stations: list[int], half: int) -> tuple[list[int], list[int]]:
-    """Top bank: stations <= half (sorted desc). Bottom bank: > half (sorted asc)."""
+def split_top_bottom(stations: list[int], venue: dict) -> tuple[list[int], list[int]]:
+    """Split a sector's stations into (top, bottom) banks, left-to-right.
+
+    If the venue declares explicit ``banks``, follow that ordering. Otherwise
+    fall back to the heuristic: stations <= half on top (desc), > half on
+    bottom (asc).
+    """
+    banks = venue.get("banks")
+    if banks:
+        sset = set(stations)
+        top = [s for s in banks["top"] if s in sset]
+        bottom = [s for s in banks["bottom"] if s in sset]
+        return top, bottom
+    half = venue["total_stations"] // 2
     top = sorted([s for s in stations if s <= half], reverse=True)
     bottom = sorted([s for s in stations if s > half])
     return top, bottom
@@ -102,20 +114,47 @@ def draw_station(c: canvas.Canvas, x: float, y: float, size: float, number: int)
     c.drawString(x + (size - text_width) / 2, y + size / 2 - 3.5, text)
 
 
-def generate(venue_name: str) -> Path:
+def effective_sectors(venue: dict, variant: dict | None) -> dict[str, list[int]]:
+    """Apply a balance variant to the venue's base sector map.
+
+    ``sector_overrides`` moves a station to another sector (e.g. Lasomin
+    variant 2: station 13 from C to D). ``excluded`` stations are dropped
+    entirely. variant=None returns the full (komplet) configuration.
+    """
+    sectors = {name: list(st) for name, st in venue["sectors"].items()}
+    if not variant:
+        return sectors
+    for st_str, target in variant.get("sector_overrides", {}).items():
+        st = int(st_str)
+        for name in sectors:
+            if st in sectors[name]:
+                sectors[name].remove(st)
+        sectors.setdefault(target, []).append(st)
+    excluded = set(variant.get("excluded", []))
+    for name in sectors:
+        sectors[name] = [s for s in sectors[name] if s not in excluded]
+    return sectors
+
+
+def generate(
+    venue_name: str,
+    variant: dict | None = None,
+    label: str = "",
+    suffix: str = "",
+) -> Path:
     register_fonts()
     venue = load_venue(venue_name)
-    total_stations = venue["total_stations"]
-    half = total_stations // 2
 
-    sector_names = sorted(venue["sectors"].keys(), reverse=True)
+    sectors_map = effective_sectors(venue, variant)
+    sector_names = sorted(sectors_map.keys(), reverse=True)
     num_sectors = len(sector_names)
     sectors_lr = [
-        {"name": name, "stations": sorted(venue["sectors"][name])}
+        {"name": name, "stations": sorted(sectors_map[name])}
         for name in sector_names
     ]
+    total_stations = sum(len(sec["stations"]) for sec in sectors_lr)
 
-    output_file = PROJECT_ROOT / f"Schemat_{venue_name.replace(' ', '_')}.pdf"
+    output_file = PROJECT_ROOT / f"Schemat_{venue_name.replace(' ', '_')}{suffix}.pdf"
     page_w, page_h = landscape(A3)
     c = canvas.Canvas(str(output_file), pagesize=landscape(A3))
     c.setTitle(f"Schemat łowiska — {venue_name}")
@@ -129,6 +168,8 @@ def generate(venue_name: str) -> Path:
 
     c.setFont(FONT_REGULAR, 14)
     subtitle = f"{total_stations} stanowisk, {num_sectors} sektorów"
+    if label:
+        subtitle = f"{label}  —  {subtitle}"
     subtitle_w = c.stringWidth(subtitle, FONT_REGULAR, 14)
     c.drawString((page_w - subtitle_w) / 2, page_h - 30*mm, subtitle)
 
@@ -150,8 +191,9 @@ def generate(venue_name: str) -> Path:
     bottom_bank_y = pond_y - gap - bank_height
 
     sector_width = area_w / num_sectors
+    splits = [split_top_bottom(sec["stations"], venue) for sec in sectors_lr]
     max_stations_per_sector_side = max(
-        len([s for s in sec["stations"] if s <= half]) for sec in sectors_lr
+        max(len(top), len(bottom)) for top, bottom in splits
     )
     station_size = min(
         bank_height - 2*mm,
@@ -186,7 +228,7 @@ def generate(venue_name: str) -> Path:
 
     # --- Top and bottom banks ---
     for i, sec in enumerate(sectors_lr):
-        top, bottom = split_top_bottom(sec["stations"], half)
+        top, bottom = splits[i]
         sector_center_x = area_x + i * sector_width + sector_width / 2
 
         total_top_w = len(top) * station_size + (len(top) - 1) * station_spacing
@@ -208,14 +250,35 @@ def generate(venue_name: str) -> Path:
     return output_file
 
 
+def variant_label(num_missing: int, variant: dict) -> str:
+    excluded = sorted(variant.get("excluded", []))
+    excl = ", ".join(str(s) for s in excluded)
+    competitor_word = "zawodnika" if num_missing == 1 else "zawodników"
+    station_word = "stanowisko" if len(excluded) == 1 else "stanowiska"
+    return (
+        f"Brak {num_missing} {competitor_word} "
+        f"(wykluczone {station_word}: {excl})"
+    )
+
+
 def main():
     venue_name = sys.argv[1] if len(sys.argv) > 1 else "Stawy Siedleckie"
     try:
-        path = generate(venue_name)
+        venue = load_venue(venue_name)
+        variants = venue.get("balance_variants")
+        if variants:
+            jobs = [(None, "Komplet", "_komplet")]
+            for key in sorted(variants, key=int):
+                v = variants[key]
+                jobs.append((v, variant_label(int(key), v), f"_brak-{key}"))
+        else:
+            jobs = [(None, "", "")]
+        for v, label, suffix in jobs:
+            path = generate(venue_name, v, label, suffix)
+            print(f"Wygenerowano: {path}")
     except ValueError as e:
         print(f"Błąd: {e}", file=sys.stderr)
         sys.exit(1)
-    print(f"Wygenerowano: {path}")
 
 
 if __name__ == "__main__":
