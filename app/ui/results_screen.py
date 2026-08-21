@@ -4,6 +4,7 @@ from tkinter import messagebox, ttk
 import customtkinter as ctk
 
 from app.repositories import competitor_repo, competition_repo, venue_repo
+from app.services import general_classification_service
 from app.services.print_service import PrintService
 from app.services.ranking_service import RankingService
 from app.services.sector_service import SectorService
@@ -21,6 +22,16 @@ class ResultsScreen(ctk.CTkFrame):
         self.app = app
         self._db_name = ""
         self._db_winner_places = None
+        self.general_tree = None
+        # Two-day final: resolved once — the pair can only change from the
+        # start screen, and navigating back rebuilds this screen anyway.
+        conn = self.app.get_connection()
+        try:
+            self._linked_pair = general_classification_service.resolve_linked_pair(
+                conn, self.app.competition_id,
+            )
+        finally:
+            conn.close()
         self._build_ui()
         self._recalculate()
         self._refresh()
@@ -54,6 +65,8 @@ class ResultsScreen(ctk.CTkFrame):
 
         self._build_classification_tab()
         self._build_winners_tab()
+        if self._linked_pair:
+            self._build_general_tab()
 
     def _build_classification_tab(self):
         tab = self.tabview.add("Klasyfikacja końcowa")
@@ -116,12 +129,51 @@ class ResultsScreen(ctk.CTkFrame):
         self.winners_tree.tag_configure("even", background=colors["even"])
         self.winners_tree.tag_configure("odd", background=colors["odd"])
 
+    def _build_general_tab(self):
+        tab = self.tabview.add("Klasyfikacja generalna")
+
+        day1, day2 = self._linked_pair
+        ctk.CTkLabel(
+            tab,
+            text=f"Suma z dwóch dni: {day1.date} + {day2.date}",
+            font=("Segoe UI", 13),
+        ).pack(fill="x", padx=5, pady=(5, 0))
+
+        # Populated when ambiguous (duplicated) names had to be excluded.
+        self.general_warning = ctk.CTkLabel(
+            tab, text="", font=("Segoe UI", 13, "bold"), text_color="#C0392B",
+        )
+        self.general_warning.pack(fill="x", padx=5, pady=(0, 2))
+
+        columns = ("place", "name", "pts1", "pts2", "pts_sum", "weight_kg")
+        headings = ("Miejsce", "Imię i Nazwisko", "Pkt dzień 1", "Pkt dzień 2", "Suma pkt", "Waga (kg)")
+        widths = (60, 250, 90, 90, 80, 100)
+        anchors = ("center", "w", "center", "center", "center", "center")
+
+        self.general_tree = ttk.Treeview(tab, columns=columns, show="headings", selectmode="browse")
+        for col, heading, width, anchor in zip(columns, headings, widths, anchors):
+            self.general_tree.heading(col, text=heading)
+            self.general_tree.column(col, width=width, minwidth=40, anchor=anchor)
+
+        scrollbar = ttk.Scrollbar(tab, orient="vertical", command=self.general_tree.yview)
+        self.general_tree.configure(yscrollcommand=scrollbar.set)
+
+        self.general_tree.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        colors = get_treeview_tag_colors(self.app.dark_mode)
+        self.general_tree.tag_configure("even", background=colors["even"])
+        self.general_tree.tag_configure("odd", background=colors["odd"])
+
     def _apply_tag_colors(self):
         colors = get_treeview_tag_colors(self.app.dark_mode)
         self.class_tree.tag_configure("even", background=colors["even"])
         self.class_tree.tag_configure("odd", background=colors["odd"])
         self.winners_tree.tag_configure("even", background=colors["even"])
         self.winners_tree.tag_configure("odd", background=colors["odd"])
+        if self.general_tree is not None:
+            self.general_tree.tag_configure("even", background=colors["even"])
+            self.general_tree.tag_configure("odd", background=colors["odd"])
 
     # -- Bottom: action buttons --
 
@@ -149,7 +201,15 @@ class ResultsScreen(ctk.CTkFrame):
         conn = self.app.get_connection()
         try:
             service = RankingService(SectorService())
-            service.calculate_all(conn, self.app.competition_id, self.app.venue_id)
+            if self._linked_pair:
+                # Keep BOTH days' persisted points fresh before the general
+                # classification aggregates them (day-1 weights may have
+                # been edited after that day was last recalculated).
+                day1, day2 = self._linked_pair
+                service.calculate_all(conn, day1.id, day1.venue_id)
+                service.calculate_all(conn, day2.id, day2.venue_id)
+            else:
+                service.calculate_all(conn, self.app.competition_id, self.app.venue_id)
         finally:
             conn.close()
 
@@ -159,8 +219,34 @@ class ResultsScreen(ctk.CTkFrame):
             self._refresh_name(conn)
             self._refresh_classification(conn)
             self._refresh_winners(conn)
+            if self.general_tree is not None:
+                self._refresh_general(conn)
         finally:
             conn.close()
+
+    def _refresh_general(self, conn):
+        self.general_tree.delete(*self.general_tree.get_children())
+        day1, day2 = self._linked_pair
+        result = general_classification_service.calculate(conn, day1.id, day2.id)
+
+        if result.duplicate_names:
+            self.general_warning.configure(
+                text="Uwaga — powtarzające się nazwiska pominięte w klasyfikacji: "
+                     + ", ".join(result.duplicate_names),
+            )
+        else:
+            self.general_warning.configure(text="")
+
+        for i, row in enumerate(result.rows):
+            tag = "even" if i % 2 == 0 else "odd"
+            self.general_tree.insert("", "end", tags=(tag,), values=(
+                str(row.place) if row.place is not None else "-",
+                row.full_name,
+                str(row.points_day1),
+                str(row.points_day2),
+                str(row.total_points),
+                format_weight_kg(row.total_weight_grams),
+            ))
 
     def _refresh_name(self, conn):
         comp = competition_repo.get_by_id(conn, self.app.competition_id)
