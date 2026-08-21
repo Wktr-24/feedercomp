@@ -103,12 +103,21 @@ class StartScreen(ctk.CTkFrame):
             ).pack(pady=20)
             return
 
+        # Competitions that already serve as day 1 of a linked pair — their
+        # rows must not offer another "Dzień 2".
+        linked_ids = {
+            c.linked_competition_id for c in competitions
+            if c.linked_competition_id is not None
+        }
+
         for comp in competitions:
             row = ctk.CTkFrame(self.competitions_frame)
             row.pack(fill="x", pady=2)
 
             venue_name = venues.get(comp.venue_id, "?")
             label_text = f"{comp.date} \u2013 {comp.name or 'Bez nazwy'} ({venue_name})"
+            if comp.linked_competition_id is not None:
+                label_text += " [dzień 2]"
             ctk.CTkLabel(row, text=label_text, font=("Segoe UI", 13)).pack(side="left", padx=5)
 
             del_btn = ctk.CTkButton(
@@ -125,6 +134,14 @@ class StartScreen(ctk.CTkFrame):
                 command=lambda c=comp: self._open_competition(c),
             )
             btn.pack(side="right", padx=5, pady=2)
+
+            # "Dzień 2" only where it makes sense: not on a day-2 itself
+            # (no chains) and not on a day-1 that already has one.
+            if comp.linked_competition_id is None and comp.id not in linked_ids:
+                ctk.CTkButton(
+                    row, text="Dzień 2", width=70,
+                    command=lambda c=comp: self._create_day2(c),
+                ).pack(side="right", padx=2, pady=2)
 
     def _create_competition(self):
         venue_name = self.venue_var.get()
@@ -186,3 +203,12 @@ class StartScreen(ctk.CTkFrame):
 
     def _open_competition(self, competition):
         self.app.on_competition_selected(competition.id, competition.venue_id)
+
+    def _create_day2(self, competition):
+        from app.ui.create_day2_dialog import CreateDay2Dialog
+        CreateDay2Dialog(
+            self, self.app, competition,
+            on_created=lambda comp_id, venue_id: self.app.on_competition_selected(
+                comp_id, venue_id,
+            ),
+        )
