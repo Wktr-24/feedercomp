@@ -1,6 +1,7 @@
 import os
 import re
 import tempfile
+from datetime import datetime
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -31,6 +32,14 @@ class PrintService:
         except Exception:
             self.font_name = 'Helvetica'
             self.font_name_bold = 'Helvetica-Bold'
+
+    def _timestamped_path(self, base_name: str) -> Path:
+        """Dated filename per print: a viewer holding the previous file open
+        can no longer cause a silent PermissionError on regeneration, and the
+        organizer gets an archive of every printout instead of one
+        overwritten file."""
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        return self.output_dir / f"{base_name}_{stamp}.pdf"
 
     @staticmethod
     def _format_display_date(comp_date: str) -> str:
@@ -99,7 +108,7 @@ class PrintService:
         from app.repositories import competitor_repo
 
         safe_sector = re.sub(r'[^A-Za-z0-9_-]', '_', sector_name)
-        filepath = self.output_dir / f"Sektor_{safe_sector}.pdf"
+        filepath = self._timestamped_path(f"Sektor_{safe_sector}")
         doc = SimpleDocTemplate(str(filepath), pagesize=A4,
                                 leftMargin=15*mm, rightMargin=15*mm,
                                 topMargin=15*mm, bottomMargin=15*mm)
@@ -126,7 +135,7 @@ class PrintService:
             ])
 
         col_widths = [70, 200, 80, 70]
-        table = Table(data, colWidths=col_widths)
+        table = Table(data, colWidths=col_widths, repeatRows=1)
         table.setStyle(self._table_style())
         elements.append(table)
 
@@ -137,7 +146,7 @@ class PrintService:
                                      venue_name: str, comp_date: str, comp_name: str | None) -> Path:
         from app.repositories import competitor_repo
 
-        filepath = self.output_dir / "Klasyfikacja_koncowa.pdf"
+        filepath = self._timestamped_path("Klasyfikacja_koncowa")
         doc = SimpleDocTemplate(str(filepath), pagesize=A4,
                                 leftMargin=15*mm, rightMargin=15*mm,
                                 topMargin=15*mm, bottomMargin=15*mm)
@@ -171,7 +180,7 @@ class PrintService:
             ])
 
         col_widths = [55, 200, 55, 70, 80]
-        table = Table(data, colWidths=col_widths)
+        table = Table(data, colWidths=col_widths, repeatRows=1)
         table.setStyle(self._table_style())
         elements.append(table)
 
@@ -183,7 +192,7 @@ class PrintService:
         from app.services.ranking_service import RankingService
         from app.services.sector_service import SectorService
 
-        filepath = self.output_dir / "Lista_zwyciezcow.pdf"
+        filepath = self._timestamped_path("Lista_zwyciezcow")
         doc = SimpleDocTemplate(str(filepath), pagesize=A4,
                                 leftMargin=15*mm, rightMargin=15*mm,
                                 topMargin=15*mm, bottomMargin=15*mm)
@@ -208,7 +217,7 @@ class PrintService:
             ])
 
         col_widths = [60, 250, 100]
-        table = Table(data, colWidths=col_widths)
+        table = Table(data, colWidths=col_widths, repeatRows=1)
         table.setStyle(self._table_style())
         elements.append(table)
 
@@ -220,7 +229,7 @@ class PrintService:
                                             comp_name: str | None) -> Path:
         from app.services import general_classification_service
 
-        filepath = self.output_dir / "Klasyfikacja_generalna.pdf"
+        filepath = self._timestamped_path("Klasyfikacja_generalna")
         doc = SimpleDocTemplate(str(filepath), pagesize=A4,
                                 leftMargin=15*mm, rightMargin=15*mm,
                                 topMargin=15*mm, bottomMargin=15*mm)
@@ -247,7 +256,7 @@ class PrintService:
             ])
 
         col_widths = [55, 185, 55, 55, 70, 80]
-        table = Table(data, colWidths=col_widths)
+        table = Table(data, colWidths=col_widths, repeatRows=1)
         table.setStyle(self._table_style())
         elements.append(table)
 

@@ -97,13 +97,18 @@ class BalanceSectorsDialog(FeederCompDialog):
         logical_req_h = int(self.winfo_reqheight() / scaling) + 20
         req_width = max(self._dialog_width, logical_req_w)
         req_height = max(self._dialog_height, logical_req_h)
+        # Never grow past the screen: the dialog is not resizable and has no
+        # scrollbar, so an over-wide window would push the rightmost sector's
+        # buttons off-screen (6 sectors + column padding on a small laptop).
+        max_logical_w = int(self.winfo_screenwidth() / scaling) - 40
+        req_width = min(req_width, max_logical_w)
         self.resize_to(req_width, req_height)
 
         self.show_modal()
         # Re-anchor separators after the window settles at its final size
         # (see _place_separators for why the <Configure> binding alone is
         # not enough).
-        self.after(100, self._place_separators)
+        self._sep_after_id = self.after(100, self._place_separators)
 
     def _load_data(self, conn):
         from app.repositories import competitor_repo
@@ -319,7 +324,9 @@ class BalanceSectorsDialog(FeederCompDialog):
 
     def _place_separators(self, _event=None) -> None:
         # grid_bbox(col, 0)[0] is the real left edge of column `col` after
-        # layout — i.e. the boundary between sectors col-1 and col. Re-runs
+        # layout — i.e. the boundary between sectors col-1 and col (with
+        # anchor="n" the 2px line deliberately straddles that edge by 1px,
+        # centering on the boundary). Re-runs
         # on every <Configure> of the pond frame AND once shortly after the
         # dialog is shown (grid_bbox can be stale at the first <Configure>,
         # before Tk's idle-time grid pass ran for the final window size —
@@ -588,7 +595,7 @@ class BalanceSectorsDialog(FeederCompDialog):
         self.hover_status_label.configure(text=full_name)
 
     def destroy(self):
-        for attr in ('_hover_after_id', '_hover_leave_after_id'):
+        for attr in ('_hover_after_id', '_hover_leave_after_id', '_sep_after_id'):
             val = getattr(self, attr, None)
             if val is not None:
                 try:
