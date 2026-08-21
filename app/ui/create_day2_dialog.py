@@ -68,23 +68,36 @@ class CreateDay2Dialog(FeederCompDialog):
         ).place(x=215, y=165)
 
     def _on_create(self):
-        from datetime import datetime
         comp_date = self.date_entry.get().strip()
         if not comp_date:
             messagebox.showwarning("Błąd", "Podaj datę.", parent=self)
             return
         try:
-            datetime.strptime(comp_date, "%Y-%m-%d")
+            # fromisoformat also rejects unpadded forms like "2026-9-5",
+            # which strptime would accept and which break date-DESC sorting.
+            parsed = date.fromisoformat(comp_date)
         except ValueError:
             messagebox.showwarning(
                 "Błąd", "Nieprawidłowy format daty. Użyj RRRR-MM-DD.", parent=self,
             )
             return
+        try:
+            source_date = date.fromisoformat(self.source.date)
+        except ValueError:
+            source_date = None
+        if source_date is not None and parsed <= source_date:
+            if not messagebox.askyesno(
+                "Uwaga",
+                f"Data dnia 2 ({comp_date}) nie jest późniejsza niż data "
+                f"dnia 1 ({self.source.date}).\n\nKontynuować?",
+                parent=self,
+            ):
+                return
         comp_name = normalize_whitespace(self.name_entry.get()) or None
 
         conn = self.app.get_connection()
         try:
-            new_id, count = create_day2(conn, self.source.id, comp_date, comp_name)
+            result = create_day2(conn, self.source.id, comp_date, comp_name)
         except Day2Error as e:
             messagebox.showwarning(
                 "Błąd",
@@ -95,13 +108,16 @@ class CreateDay2Dialog(FeederCompDialog):
         finally:
             conn.close()
 
-        messagebox.showinfo(
-            "Dzień 2",
-            f"Utworzono dzień 2.\nSkopiowano {count} zawodników.",
-            parent=self,
-        )
+        info = f"Utworzono dzień 2.\nSkopiowano {result.copied_count} zawodników."
+        if result.duplicate_names:
+            info += (
+                "\n\nUwaga — powtarzające się nazwiska na liście (zostaną "
+                "pominięte w klasyfikacji generalnej, popraw je przed finałem): "
+                + ", ".join(result.duplicate_names)
+            )
+        messagebox.showinfo("Dzień 2", info, parent=self)
         on_created = self.on_created
         venue_id = self.source.venue_id
         self.destroy()
         if on_created:
-            on_created(new_id, venue_id)
+            on_created(result.competition_id, venue_id)

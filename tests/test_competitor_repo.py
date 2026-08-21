@@ -187,6 +187,20 @@ class TestNameExists:
         db.commit()
         assert competitor_repo.name_exists(db, comp_id, "łukasz żółty") is True
 
+    def test_unicode_nfc_normalization(self, db):
+        # Precomposed "ó" vs decomposed "o"+combining acute (U+0301)
+        # must yield the same identity key — a name pasted from another
+        # source must still be caught as a duplicate (and pair across days).
+        import unicodedata
+        precomposed = "Józef Rózga"
+        decomposed = unicodedata.normalize("NFD", precomposed)
+        assert precomposed != decomposed  # sanity: the two spellings differ
+
+        comp_id = _make_competition(db)
+        competitor_repo.add(db, comp_id, 1, precomposed)
+        db.commit()
+        assert competitor_repo.name_exists(db, comp_id, decomposed) is True
+
     def test_whitespace_insensitive(self, db):
         comp_id = _make_competition(db)
         competitor_repo.add(db, comp_id, 1, "Jan Kowalski")

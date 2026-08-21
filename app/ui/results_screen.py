@@ -139,7 +139,16 @@ class ResultsScreen(ctk.CTkFrame):
             font=("Segoe UI", 13),
         ).pack(fill="x", padx=5, pady=(5, 0))
 
-        # Populated when ambiguous (duplicated) names had to be excluded.
+        # Classified/per-day counts — lets the organizer eyeball at a glance
+        # that nobody silently fell out of the pairing.
+        self.general_info = ctk.CTkLabel(
+            tab, text="", font=("Segoe UI", 13),
+            text_color=("gray40", "gray70"),
+        )
+        self.general_info.pack(fill="x", padx=5, pady=(0, 0))
+
+        # Populated when ambiguous (duplicated) or unpaired names had to be
+        # excluded from the classification.
         self.general_warning = ctk.CTkLabel(
             tab, text="", font=("Segoe UI", 13, "bold"), text_color="#C0392B",
         )
@@ -234,13 +243,23 @@ class ResultsScreen(ctk.CTkFrame):
         day1, day2 = self._linked_pair
         result = general_classification_service.calculate(conn, day1.id, day2.id)
 
+        self.general_info.configure(
+            text=f"Sklasyfikowani: {len(result.rows)}    "
+                 f"(dzień 1: {result.day1_count}, dzień 2: {result.day2_count})",
+        )
+
+        warnings = []
         if result.duplicate_names:
-            self.general_warning.configure(
-                text="Uwaga — powtarzające się nazwiska pominięte w klasyfikacji: "
-                     + ", ".join(result.duplicate_names),
+            warnings.append(
+                "Powtarzające się nazwiska pominięte w klasyfikacji: "
+                + ", ".join(result.duplicate_names)
             )
-        else:
-            self.general_warning.configure(text="")
+        if result.unpaired_names:
+            warnings.append(
+                "Tylko w jednym dniu (pominięci): "
+                + ", ".join(result.unpaired_names)
+            )
+        self.general_warning.configure(text="\n".join(warnings))
 
         for i, row in enumerate(result.rows):
             tag = "even" if i % 2 == 0 else "odd"
@@ -484,15 +503,27 @@ class ResultsScreen(ctk.CTkFrame):
             return
         conn = self.app.get_connection()
         try:
-            day1, day2 = self._linked_pair
+            # Re-read both days from the DB — the __init__ snapshot's name can
+            # be stale after a rename applied on this very screen (ids are
+            # stable, names are not).
+            day1 = competition_repo.get_by_id(conn, self._linked_pair[0].id)
+            day2 = competition_repo.get_by_id(conn, self._linked_pair[1].id)
             venue = venue_repo.get_by_id(conn, day1.venue_id)
             result = general_classification_service.calculate(conn, day1.id, day2.id)
+            warnings = []
             if result.duplicate_names:
+                warnings.append(
+                    "Powtarzające się nazwiska pominięte w klasyfikacji: "
+                    + ", ".join(result.duplicate_names)
+                )
+            if result.unpaired_names:
+                warnings.append(
+                    "Zawodnicy tylko w jednym dniu (pominięci): "
+                    + ", ".join(result.unpaired_names)
+                )
+            if warnings:
                 messagebox.showwarning(
-                    "Duplikaty nazwisk",
-                    "Powtarzające się nazwiska zostały pominięte w klasyfikacji: "
-                    + ", ".join(result.duplicate_names),
-                    parent=self,
+                    "Uwaga", "\n\n".join(warnings), parent=self,
                 )
             ps = PrintService()
             # day1.name is the natural competition name (without " — dzień 2").

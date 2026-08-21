@@ -23,4 +23,7 @@ class TestGeneralClassificationPdf:
 
         assert path.exists()
         assert path.stat().st_size > 0
-        assert path.name == "Klasyfikacja_generalna.pdf"
+        # Dated filename: archive per print + no PermissionError when a
+        # viewer still holds a previous file open.
+        assert path.name.startswith("Klasyfikacja_generalna_")
+        assert path.name.endswith(".pdf")

@@ -47,7 +47,8 @@ def get_day2_of(conn: sqlite3.Connection, competition_id: int) -> Competition | 
     one (i.e. its day 2), or None. 1:1 by construction — competition_service
     refuses to create a second day 2 for the same source."""
     row = conn.execute(
-        f"SELECT {_COLUMNS} FROM competitions WHERE linked_competition_id = ?",
+        f"SELECT {_COLUMNS} FROM competitions WHERE linked_competition_id = ? "
+        "ORDER BY id LIMIT 1",
         (competition_id,),
     ).fetchone()
     return Competition(**row) if row else None

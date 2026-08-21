@@ -29,6 +29,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from app.models.competition import Competition
+from app.models.competitor import Competitor
 from app.repositories import competition_repo, competitor_repo
 from app.utils import name_key
 
@@ -49,6 +50,13 @@ class GeneralRow:
 class GeneralClassification:
     rows: list[GeneralRow]
     duplicate_names: list[str]
+    # Tripwire for data errors: at the final everyone fishes both days, so a
+    # participant of exactly one day is almost certainly a typo fixed on one
+    # day only — and a silent drop would shift everyone below them up a
+    # place. The UI surfaces these names next to the duplicates warning.
+    unpaired_names: list[str]
+    day1_count: int
+    day2_count: int
 
 
 def resolve_linked_pair(
@@ -70,33 +78,46 @@ def resolve_linked_pair(
     return comp, day2
 
 
-def _participants_by_key(conn, competition_id):
+def _participants_by_key(
+    conn: sqlite3.Connection, competition_id: int,
+) -> tuple[dict[str, Competitor], dict[str, str], int]:
     """Map normalized name -> competitor for everyone who took part that day.
-    Second return value: display names of keys that appear more than once."""
-    by_key: dict[str, object] = {}
+    Also returns display names of keys appearing more than once, and the raw
+    participant count (duplicates included)."""
+    by_key: dict[str, Competitor] = {}
     duplicate_display: dict[str, str] = {}
+    count = 0
     for c in competitor_repo.get_all(conn, competition_id):
         if c.sector_name is None or c.sector_points is None:
             continue
+        count += 1
         key = name_key(c.full_name)
         if key in by_key:
             duplicate_display.setdefault(key, by_key[key].full_name)
         else:
             by_key[key] = c
-    return by_key, duplicate_display
+    return by_key, duplicate_display, count
 
 
 def calculate(
     conn: sqlite3.Connection, day1_id: int, day2_id: int,
 ) -> GeneralClassification:
-    day1_by_key, dup1 = _participants_by_key(conn, day1_id)
-    day2_by_key, dup2 = _participants_by_key(conn, day2_id)
+    day1_by_key, dup1, day1_count = _participants_by_key(conn, day1_id)
+    day2_by_key, dup2, day2_count = _participants_by_key(conn, day2_id)
 
     duplicate_display = {**dup2, **dup1}
     for key in duplicate_display:
         day1_by_key.pop(key, None)
         day2_by_key.pop(key, None)
     duplicate_names = sorted(duplicate_display.values())
+
+    # Names present on exactly one day (after duplicate removal) — omitted
+    # from the table per the organizer's rule, but reported so a typo can't
+    # silently reshuffle the standings.
+    unpaired_keys = set(day1_by_key) ^ set(day2_by_key)
+    unpaired_names = sorted(
+        (day1_by_key.get(k) or day2_by_key[k]).full_name for k in unpaired_keys
+    )
 
     rows: list[GeneralRow] = []
     for key, c1 in day1_by_key.items():
@@ -128,5 +149,11 @@ def calculate(
             place = i + 1
         r.place = place
 
-    zero.sort(key=lambda r: r.full_name)
-    return GeneralClassification(rows=scored + zero, duplicate_names=duplicate_names)
+    zero.sort(key=lambda r: name_key(r.full_name))
+    return GeneralClassification(
+        rows=scored + zero,
+        duplicate_names=duplicate_names,
+        unpaired_names=unpaired_names,
+        day1_count=day1_count,
+        day2_count=day2_count,
+    )

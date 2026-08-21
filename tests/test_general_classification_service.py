@@ -60,6 +60,8 @@ class TestBasicTwoDay:
         day1, day2 = self._build(db)
         result = calculate(db, day1, day2)
         assert result.duplicate_names == []
+        assert result.unpaired_names == []
+        assert (result.day1_count, result.day2_count) == (6, 6)
         assert [(r.place, r.full_name) for r in result.rows] == [
             (1, "Darek"), (2, "Beata"), (3, "Adam"),
             (4, "Ewa"), (5, "Celina"), (6, "Filip"),
@@ -134,8 +136,11 @@ class TestParticipationFilter:
             "A": [(1, "Adam", 1000)],
         }, linked_to=day1)
 
-        rows = calculate(db, day1, day2).rows
-        assert [r.full_name for r in rows] == ["Adam"]
+        result = calculate(db, day1, day2)
+        assert [r.full_name for r in result.rows] == ["Adam"]
+        # The tripwire: the one-day participant is reported, never silently dropped.
+        assert result.unpaired_names == ["Tylko Jeden Dzień"]
+        assert (result.day1_count, result.day2_count) == (2, 1)
 
     def test_on_roster_but_no_station_counts_as_absent(self, db):
         day1, _ = _setup_day(db, "2026-09-05", None, {
@@ -148,8 +153,9 @@ class TestParticipationFilter:
         competitor_repo.add(db, day2, 2, "Bez Stanowiska")
         db.commit()
 
-        rows = calculate(db, day1, day2).rows
-        assert [r.full_name for r in rows] == ["Adam"]
+        result = calculate(db, day1, day2)
+        assert [r.full_name for r in result.rows] == ["Adam"]
+        assert result.unpaired_names == ["Bez Stanowiska"]
 
 
 class TestNameMatching:
@@ -177,6 +183,7 @@ class TestNameMatching:
 
         result = calculate(db, day1, day2)
         assert result.duplicate_names == ["Jan Kowalski"]
+        assert result.unpaired_names == []
         assert [r.full_name for r in result.rows] == ["Adam"]
 
 

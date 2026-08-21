@@ -30,10 +30,11 @@ def day1_id(db, venue_id):
 
 class TestCreateDay2HappyPath:
     def test_copies_roster_fields_in_order(self, db, day1_id):
-        new_id, count = create_day2(db, day1_id, "2026-09-06", "Finał — dzień 2")
-        assert count == 3
+        result = create_day2(db, day1_id, "2026-09-06", "Finał — dzień 2")
+        assert result.copied_count == 3
+        assert result.duplicate_names == []
 
-        copied = competitor_repo.get_all(db, new_id)
+        copied = competitor_repo.get_all(db, result.competition_id)
         source = competitor_repo.get_all(db, day1_id)
         assert [(c.list_number, c.full_name, c.phone, c.payment_status) for c in copied] == [
             (c.list_number, c.full_name, c.phone, c.payment_status) for c in source
@@ -48,9 +49,9 @@ class TestCreateDay2HappyPath:
         competitor_repo.update_rankings(db, source[0].id, 1, 1, 1)
         db.commit()
 
-        new_id, _ = create_day2(db, day1_id, "2026-09-06", None)
+        result = create_day2(db, day1_id, "2026-09-06", None)
 
-        for c in competitor_repo.get_all(db, new_id):
+        for c in competitor_repo.get_all(db, result.competition_id):
             assert c.is_present is False
             assert c.station_number is None
             assert c.sector_name is None
@@ -60,8 +61,8 @@ class TestCreateDay2HappyPath:
             assert c.final_place is None
 
     def test_competition_fields_copied_and_linked(self, db, venue_id, day1_id):
-        new_id, _ = create_day2(db, day1_id, "2026-09-06", "Finał — dzień 2")
-        day2 = competition_repo.get_by_id(db, new_id)
+        result = create_day2(db, day1_id, "2026-09-06", "Finał — dzień 2")
+        day2 = competition_repo.get_by_id(db, result.competition_id)
         assert day2.venue_id == venue_id
         assert day2.date == "2026-09-06"
         assert day2.name == "Finał — dzień 2"
@@ -74,17 +75,17 @@ class TestCreateDay2HappyPath:
         competition_sector_overrides_repo.set_overrides(db, day1_id, {13: "D"})
         db.commit()
 
-        new_id, _ = create_day2(db, day1_id, "2026-09-06", None)
+        result = create_day2(db, day1_id, "2026-09-06", None)
 
-        assert excluded_station_repo.get_excluded(db, new_id) == []
-        assert competition_sector_overrides_repo.get_overrides(db, new_id) == {}
+        assert excluded_station_repo.get_excluded(db, result.competition_id) == []
+        assert competition_sector_overrides_repo.get_overrides(db, result.competition_id) == {}
 
     def test_empty_roster_returns_zero(self, db, venue_id):
         empty_id = competition_repo.create(db, venue_id, "2026-09-05")
         db.commit()
-        new_id, count = create_day2(db, empty_id, "2026-09-06", None)
-        assert count == 0
-        assert competitor_repo.get_all(db, new_id) == []
+        result = create_day2(db, empty_id, "2026-09-06", None)
+        assert result.copied_count == 0
+        assert competitor_repo.get_all(db, result.competition_id) == []
 
     def test_source_untouched(self, db, day1_id):
         before = [(c.id, c.list_number, c.full_name) for c in competitor_repo.get_all(db, day1_id)]
@@ -100,9 +101,9 @@ class TestCreateDay2Guards:
         assert exc.value.reason == "source_missing"
 
     def test_source_is_day2(self, db, day1_id):
-        day2_id, _ = create_day2(db, day1_id, "2026-09-06", None)
+        result = create_day2(db, day1_id, "2026-09-06", None)
         with pytest.raises(Day2Error) as exc:
-            create_day2(db, day2_id, "2026-09-07", None)
+            create_day2(db, result.competition_id, "2026-09-07", None)
         assert exc.value.reason == "source_is_day2"
 
     def test_already_has_day2(self, db, day1_id):
@@ -118,3 +119,20 @@ class TestCreateDay2Guards:
             create_day2(db, day1_id, "2026-09-07", None)
         count_after = db.execute("SELECT COUNT(*) FROM competitions").fetchone()[0]
         assert count_after == count_before
+
+
+class TestCreateDay2DuplicateReport:
+    def test_legacy_duplicates_copied_and_reported(self, db, venue_id):
+        # Rosters entered before the duplicate guard existed can hold the
+        # same name twice; the copy must stay faithful and report it.
+        comp_id = competition_repo.create(db, venue_id, "2026-09-05")
+        competitor_repo.add(db, comp_id, 1, "Jan Kowalski")
+        competitor_repo.add(db, comp_id, 2, "JAN KOWALSKI")
+        competitor_repo.add(db, comp_id, 3, "Adam Nowak")
+        db.commit()
+
+        result = create_day2(db, comp_id, "2026-09-06", None)
+
+        assert result.copied_count == 3
+        assert result.duplicate_names == ["Jan Kowalski"]
+        assert len(competitor_repo.get_all(db, result.competition_id)) == 3

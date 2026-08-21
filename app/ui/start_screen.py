@@ -118,6 +118,8 @@ class StartScreen(ctk.CTkFrame):
             label_text = f"{comp.date} \u2013 {comp.name or 'Bez nazwy'} ({venue_name})"
             if comp.linked_competition_id is not None:
                 label_text += " [dzień 2]"
+            elif comp.id in linked_ids:
+                label_text += " [dzień 1]"
             ctk.CTkLabel(row, text=label_text, font=("Segoe UI", 13)).pack(side="left", padx=5)
 
             del_btn = ctk.CTkButton(
@@ -191,7 +193,21 @@ class StartScreen(ctk.CTkFrame):
         self.app.show_venue_editor(venue.id)
 
     def _delete_competition(self, competition):
-        if not messagebox.askyesno("Potwierdzenie", f"Usunąć zawody '{competition.name or 'Bez nazwy'}'?"):
+        msg = f"Usunąć zawody '{competition.name or 'Bez nazwy'}'?"
+        conn = self.app.get_connection()
+        try:
+            has_day2 = competition_repo.get_day2_of(conn, competition.id) is not None
+        finally:
+            conn.close()
+        if has_day2:
+            # Deleting day 1 demotes its day 2 to a regular competition
+            # (ON DELETE SET NULL) — the general classification vanishes and
+            # there is no way to re-link. Half a final is one click away.
+            msg += (
+                "\n\nUWAGA: te zawody mają powiązany dzień 2. Po usunięciu "
+                "klasyfikacja generalna z dwóch dni przestanie działać."
+            )
+        if not messagebox.askyesno("Potwierdzenie", msg):
             return
         conn = self.app.get_connection()
         try:

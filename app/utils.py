@@ -1,5 +1,6 @@
 import os
 import re
+import unicodedata
 
 from app.config import get_bundle_dir
 
@@ -45,13 +46,15 @@ def set_window_icon(window) -> None:
 
 
 def name_key(text: str) -> str:
-    """Canonical identity key for a competitor name: whitespace-normalized
-    and case-folded. Used both for duplicate detection within a competition
-    and for pairing competitors across the two days of a final — the two
-    must agree, or a name the duplicate guard allows could still be
-    ambiguous to the pairing logic.
+    """Canonical identity key for a competitor name: Unicode-NFC-normalized,
+    whitespace-normalized and case-folded. Used both for duplicate detection
+    within a competition and for pairing competitors across the two days of
+    a final — the two must agree, or a name the duplicate guard allows could
+    still be ambiguous to the pairing logic. NFC folds precomposed and
+    combining-diacritic spellings (e.g. "ó" vs "o"+U+0301) into one key so a
+    name pasted from another source still pairs.
     """
-    return normalize_whitespace(text).casefold()
+    return unicodedata.normalize("NFC", normalize_whitespace(text)).casefold()
 
 
 def normalize_whitespace(text: str) -> str:
