@@ -32,7 +32,16 @@ class PrintService:
             self.font_name = 'Helvetica'
             self.font_name_bold = 'Helvetica-Bold'
 
-    def _build_header(self, venue_name: str, comp_date: str, comp_name: str | None) -> list:
+    @staticmethod
+    def _format_display_date(comp_date: str) -> str:
+        try:
+            parts = comp_date.split("-")
+            return f"{parts[2]}.{parts[1]}.{parts[0]}"
+        except (IndexError, AttributeError):
+            return comp_date
+
+    def _build_header(self, venue_name: str, comp_date: str, comp_name: str | None,
+                      comp_date2: str | None = None) -> list:
         styles = getSampleStyleSheet()
         title_style = ParagraphStyle(
             'CustomTitle',
@@ -54,11 +63,10 @@ class PrintService:
         elements = []
         elements.append(Paragraph("WKS FEEDERLAND", title_style))
 
-        try:
-            parts = comp_date.split("-")
-            display_date = f"{parts[2]}.{parts[1]}.{parts[0]}"
-        except (IndexError, AttributeError):
-            display_date = comp_date
+        display_date = self._format_display_date(comp_date)
+        if comp_date2:
+            # Two-day final: both dates, en dash between them.
+            display_date = f"{display_date} – {self._format_display_date(comp_date2)}"
 
         date_text = f"ZAWODY {display_date}"
         if comp_name:
@@ -200,6 +208,45 @@ class PrintService:
             ])
 
         col_widths = [60, 250, 100]
+        table = Table(data, colWidths=col_widths)
+        table.setStyle(self._table_style())
+        elements.append(table)
+
+        doc.build(elements)
+        return filepath
+
+    def generate_general_classification_pdf(self, conn, day1_id: int, day2_id: int,
+                                            venue_name: str, date1: str, date2: str,
+                                            comp_name: str | None) -> Path:
+        from app.services import general_classification_service
+
+        filepath = self.output_dir / "Klasyfikacja_generalna.pdf"
+        doc = SimpleDocTemplate(str(filepath), pagesize=A4,
+                                leftMargin=15*mm, rightMargin=15*mm,
+                                topMargin=15*mm, bottomMargin=15*mm)
+
+        elements = self._build_header(venue_name, date1, comp_name, comp_date2=date2)
+
+        styles = getSampleStyleSheet()
+        title = ParagraphStyle('GeneralTitle', parent=styles['Heading2'],
+                                fontName=self.font_name_bold, alignment=TA_CENTER, fontSize=14)
+        elements.append(Paragraph("KLASYFIKACJA GENERALNA — 2 DNI", title))
+        elements.append(Spacer(1, 3*mm))
+
+        result = general_classification_service.calculate(conn, day1_id, day2_id)
+
+        data = [['MIEJSCE', 'IMIĘ I NAZWISKO', 'PKT D1', 'PKT D2', 'SUMA PKT', 'WAGA (kg)']]
+        for row in result.rows:
+            data.append([
+                str(row.place) if row.place is not None else "-",
+                row.full_name,
+                str(row.points_day1),
+                str(row.points_day2),
+                str(row.total_points),
+                format_weight_kg(row.total_weight_grams),
+            ])
+
+        col_widths = [55, 185, 55, 55, 70, 80]
         table = Table(data, colWidths=col_widths)
         table.setStyle(self._table_style())
         elements.append(table)

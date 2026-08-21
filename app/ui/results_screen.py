@@ -194,6 +194,11 @@ class ResultsScreen(ctk.CTkFrame):
             bottom, text="Drukuj sektory (PDF)",
             command=self._print_sectors, width=160,
         ).pack(side="left", padx=3)
+        if self._linked_pair:
+            ctk.CTkButton(
+                bottom, text="Drukuj generalną (PDF)",
+                command=self._print_general, width=170,
+            ).pack(side="left", padx=3)
 
     # -- Data operations --
 
@@ -470,6 +475,31 @@ class ResultsScreen(ctk.CTkFrame):
                     subprocess.Popen(['xdg-open', str(folder)])
             else:
                 messagebox.showwarning("PDF", "Brak sektorów do wydruku.", parent=self)
+        finally:
+            conn.close()
+
+    def _print_general(self):
+        if self._has_unsaved_changes():
+            self._warn_unsaved_changes()
+            return
+        conn = self.app.get_connection()
+        try:
+            day1, day2 = self._linked_pair
+            venue = venue_repo.get_by_id(conn, day1.venue_id)
+            result = general_classification_service.calculate(conn, day1.id, day2.id)
+            if result.duplicate_names:
+                messagebox.showwarning(
+                    "Duplikaty nazwisk",
+                    "Powtarzające się nazwiska zostały pominięte w klasyfikacji: "
+                    + ", ".join(result.duplicate_names),
+                    parent=self,
+                )
+            ps = PrintService()
+            # day1.name is the natural competition name (without " — dzień 2").
+            path = ps.generate_general_classification_pdf(
+                conn, day1.id, day2.id, venue.name, day1.date, day2.date, day1.name,
+            )
+            ps.open_pdf(path)
         finally:
             conn.close()
 
