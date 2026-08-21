@@ -67,6 +67,10 @@ CREATE TABLE IF NOT EXISTS competition_sector_overrides (
 
 _SEED_DATA_PATH = get_bundle_dir() / "seed_data" / "venues.json"
 
+# Single point of change should the final venue ever be renamed
+# (also referenced by tests/test_final_venue_seed.py).
+_FINAL_VENUE_NAME = "Stawy Siedleckie — Finał"
+
 
 def get_connection(db_path: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(str(db_path))
@@ -130,11 +134,44 @@ def _migrate_lasomin_sectors(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def _migrate_final_venue(conn: sqlite3.Connection) -> None:
+    # Migration: 2026-08 six-sector final venue ("Stawy Siedleckie — Finał").
+    # Production DBs created before this venue existed in the seed JSON never
+    # re-read it (_seed_default_venues short-circuits when venues exist), so
+    # insert the venue + its sectors here. Idempotent — short-circuits when
+    # a venue with this name is already present.
+    row = conn.execute(
+        "SELECT id FROM venues WHERE name = ?", (_FINAL_VENUE_NAME,)
+    ).fetchone()
+    if row:
+        return
+    with open(_SEED_DATA_PATH, encoding="utf-8") as f:
+        data = json.load(f)
+    venue_data = next(
+        (v for v in data["venues"] if v["name"] == _FINAL_VENUE_NAME), None
+    )
+    if not venue_data:
+        return
+    cursor = conn.execute(
+        "INSERT INTO venues (name, total_stations) VALUES (?, ?)",
+        (venue_data["name"], venue_data["total_stations"]),
+    )
+    venue_id = cursor.lastrowid
+    for sector_name, stations in venue_data.get("sectors", {}).items():
+        for station in stations:
+            conn.execute(
+                "INSERT INTO venue_sectors (venue_id, sector_name, station_number) VALUES (?, ?, ?)",
+                (venue_id, sector_name, station),
+            )
+    conn.commit()
+
+
 def init_db_with_connection(conn: sqlite3.Connection) -> None:
     conn.execute("PRAGMA foreign_keys = ON")
     _create_tables(conn)
     _seed_default_venues(conn)
     _migrate_lasomin_sectors(conn)
+    _migrate_final_venue(conn)
 
 
 def init_db(db_path: Path) -> None:
