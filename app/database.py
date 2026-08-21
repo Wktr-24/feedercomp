@@ -26,7 +26,8 @@ CREATE TABLE IF NOT EXISTS competitions (
     name TEXT,
     max_competitors INTEGER DEFAULT 50,
     winner_places INTEGER DEFAULT 3,
-    created_at TEXT DEFAULT (datetime('now'))
+    created_at TEXT DEFAULT (datetime('now')),
+    linked_competition_id INTEGER REFERENCES competitions(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS competitors (
@@ -166,12 +167,30 @@ def _migrate_final_venue(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def _migrate_linked_competition_column(conn: sqlite3.Connection) -> None:
+    # Migration: 2026-08 two-day final — linked_competition_id column.
+    # A day-2 competition points at its day-1 via this column; ON DELETE SET
+    # NULL so deleting day-1 gracefully demotes day-2 to a regular
+    # competition instead of failing the FK check. CREATE TABLE IF NOT
+    # EXISTS never alters existing tables, so production DBs need this
+    # ALTER. Idempotent — short-circuits when the column already exists.
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(competitions)")}
+    if "linked_competition_id" in cols:
+        return
+    conn.execute(
+        "ALTER TABLE competitions ADD COLUMN linked_competition_id INTEGER "
+        "REFERENCES competitions(id) ON DELETE SET NULL"
+    )
+    conn.commit()
+
+
 def init_db_with_connection(conn: sqlite3.Connection) -> None:
     conn.execute("PRAGMA foreign_keys = ON")
     _create_tables(conn)
     _seed_default_venues(conn)
     _migrate_lasomin_sectors(conn)
     _migrate_final_venue(conn)
+    _migrate_linked_competition_column(conn)
 
 
 def init_db(db_path: Path) -> None:

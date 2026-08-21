@@ -3,6 +3,12 @@ import sqlite3
 from app.models.competition import Competition
 
 
+_COLUMNS = (
+    "id, venue_id, date, name, max_competitors, winner_places, created_at, "
+    "linked_competition_id"
+)
+
+
 def create(
     conn: sqlite3.Connection,
     venue_id: int,
@@ -10,27 +16,38 @@ def create(
     name: str | None = None,
     max_competitors: int = 50,
     winner_places: int = 3,
+    linked_competition_id: int | None = None,
 ) -> int:
     cursor = conn.execute(
-        "INSERT INTO competitions (venue_id, date, name, max_competitors, winner_places) "
-        "VALUES (?, ?, ?, ?, ?)",
-        (venue_id, date, name, max_competitors, winner_places),
+        "INSERT INTO competitions "
+        "(venue_id, date, name, max_competitors, winner_places, linked_competition_id) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (venue_id, date, name, max_competitors, winner_places, linked_competition_id),
     )
     return cursor.lastrowid
 
 
 def get_all(conn: sqlite3.Connection) -> list[Competition]:
     rows = conn.execute(
-        "SELECT id, venue_id, date, name, max_competitors, winner_places, created_at "
-        "FROM competitions ORDER BY date DESC"
+        f"SELECT {_COLUMNS} FROM competitions ORDER BY date DESC"
     ).fetchall()
     return [Competition(**row) for row in rows]
 
 
 def get_by_id(conn: sqlite3.Connection, competition_id: int) -> Competition | None:
     row = conn.execute(
-        "SELECT id, venue_id, date, name, max_competitors, winner_places, created_at "
-        "FROM competitions WHERE id = ?",
+        f"SELECT {_COLUMNS} FROM competitions WHERE id = ?",
+        (competition_id,),
+    ).fetchone()
+    return Competition(**row) if row else None
+
+
+def get_day2_of(conn: sqlite3.Connection, competition_id: int) -> Competition | None:
+    """Return the competition whose linked_competition_id points at the given
+    one (i.e. its day 2), or None. 1:1 by construction — competition_service
+    refuses to create a second day 2 for the same source."""
+    row = conn.execute(
+        f"SELECT {_COLUMNS} FROM competitions WHERE linked_competition_id = ?",
         (competition_id,),
     ).fetchone()
     return Competition(**row) if row else None
