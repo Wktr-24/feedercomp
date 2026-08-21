@@ -1,4 +1,4 @@
-from tkinter import messagebox
+from tkinter import TclError, messagebox
 
 import customtkinter as ctk
 
@@ -42,26 +42,6 @@ def compute_resulting_sizes(
 def _format_distribution(sizes: dict[str, int], sector_order: list[str]) -> str:
     """Format sector sizes as compact 'D=8 C=8 B=8 A=8' string in given order."""
     return " ".join(f"{name}={sizes.get(name, 0)}" for name in sector_order)
-
-
-def compute_separator_positions(sector_sizes_lr: list[int]) -> list[float]:
-    """Return separator x-positions (as fractions of total width) for sectors
-    rendered left-to-right with the given physical sizes.
-
-    Examples:
-      [9, 9, 8, 8]   → [9/34, 18/34, 26/34]    (Lasomin full house)
-      [10, 8, 8, 8]  → [10/34, 18/34, 26/34]   (Lasomin after variant 2)
-      [10, 10, 10, 10, 10] → [0.2, 0.4, 0.6, 0.8] (Stawy — unchanged from equal)
-    """
-    total = sum(sector_sizes_lr)
-    if total == 0 or len(sector_sizes_lr) <= 1:
-        return []
-    positions = []
-    cumulative = 0
-    for size in sector_sizes_lr[:-1]:
-        cumulative += size
-        positions.append(cumulative / total)
-    return positions
 
 
 def split_stations_to_banks(
@@ -120,6 +100,10 @@ class BalanceSectorsDialog(FeederCompDialog):
         self.resize_to(req_width, req_height)
 
         self.show_modal()
+        # Re-anchor separators after the window settles at its final size
+        # (see _place_separators for why the <Configure> binding alone is
+        # not enough).
+        self.after(100, self._place_separators)
 
     def _load_data(self, conn):
         from app.repositories import competitor_repo
@@ -184,9 +168,8 @@ class BalanceSectorsDialog(FeederCompDialog):
         }
         # Proportional column widths so a sector with more stations (e.g. D after
         # Lasomin variant 2: 10 stations vs 8 elsewhere) renders wider than its
-        # neighbours and the pond separators line up with sector boundaries.
+        # neighbours.
         sector_weights = [len(s["stations"]) for s in sectors_lr]
-        separator_positions = compute_separator_positions(sector_weights)
 
         header = ctk.CTkLabel(
             self,
@@ -203,12 +186,14 @@ class BalanceSectorsDialog(FeederCompDialog):
         for i, weight in enumerate(sector_weights):
             top_frame.grid_columnconfigure(i, weight=weight)
 
+        self._top_inners: list[ctk.CTkFrame] = []
         for idx, sector in enumerate(sectors_lr):
             cell = ctk.CTkFrame(top_frame, fg_color="transparent")
             cell.grid(row=0, column=idx, sticky="nsew")
             # Inner frame centers buttons within the uniform-width cell
             inner = ctk.CTkFrame(cell, fg_color="transparent")
             inner.pack(expand=True)
+            self._top_inners.append(inner)
             top_stations, _ = sector_banks[sector["name"]]
             for station in top_stations:
                 key = (sector["name"], station)
@@ -238,12 +223,19 @@ class BalanceSectorsDialog(FeederCompDialog):
             lbl.grid(row=0, column=idx, sticky="nsew")
             self.sector_labels[sector["name"]] = lbl
 
-        # Separators between sectors — placed proportionally to actual sector
-        # sizes so they align with grid column boundaries (which now use
-        # weight=len(stations) instead of equal weights).
-        for relx in separator_positions:
-            sep = ctk.CTkFrame(pond_frame, width=2, fg_color="#E74C3C")
-            sep.place(relx=relx, rely=0.0, relheight=1.0, anchor="n")
+        # Separators between sectors — placed at the MEASURED grid column
+        # boundaries once the pond frame is laid out (see _place_separators).
+        # Idealized cumulative fractions are not enough: grid distributes
+        # only surplus space by weight, so a bank cell whose buttons exceed
+        # the sector's proportional share (e.g. final venue: sector C has 5
+        # top-bank buttons squeezed into a 9/50 column) pushes the real
+        # column edges away from the ideal fractions.
+        self._pond_frame = pond_frame
+        self._separators = [
+            ctk.CTkFrame(pond_frame, width=2, fg_color="#E74C3C")
+            for _ in range(len(sectors_lr) - 1)
+        ]
+        pond_frame.bind("<Configure>", self._place_separators, add="+")
 
         # --- bottom bank ---
         bottom_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -251,17 +243,22 @@ class BalanceSectorsDialog(FeederCompDialog):
         for i, weight in enumerate(sector_weights):
             bottom_frame.grid_columnconfigure(i, weight=weight)
 
+        self._bottom_inners: list[ctk.CTkFrame] = []
         for idx, sector in enumerate(sectors_lr):
             cell = ctk.CTkFrame(bottom_frame, fg_color="transparent")
             cell.grid(row=0, column=idx, sticky="nsew")
             # Inner frame centers buttons within the uniform-width cell
             inner = ctk.CTkFrame(cell, fg_color="transparent")
             inner.pack(expand=True)
+            self._bottom_inners.append(inner)
             _, bot_stations = sector_banks[sector["name"]]
             for station in bot_stations:
                 key = (sector["name"], station)
                 btn = self._create_station_button(inner, key)
                 btn.pack(side="left", padx=2, pady=2)
+
+        self._sector_row_frames = (top_frame, pond_frame, bottom_frame)
+        self._sync_sector_columns(sector_weights)
 
         # --- counter and action buttons ---
         self.counter_label = ctk.CTkLabel(
@@ -295,6 +292,50 @@ class BalanceSectorsDialog(FeederCompDialog):
             ctk.CTkButton(
                 btn_frame, text="Przywróć wszystkie", command=self._restore_all, width=160,
             ).pack(side="right", padx=10)
+
+    def _sync_sector_columns(self, sector_weights: list[int]) -> None:
+        """Give all three rows (top bank, pond, bottom bank) identical grid
+        columns. Each column's minimum width is the wider of its two bank
+        cells, measured physically (DPI-safe). Without a shared minsize the
+        top and bottom grids diverge whenever one bank holds more buttons
+        than the sector's proportional share fits (final venue: sector C has
+        5 top vs 4 bottom stations, F the reverse) — and then no single
+        separator line can match both banks.
+
+        The extra padding guarantees breathing room between a full cell's
+        edge buttons and the sector separators — without it the fullest
+        cell's buttons sit flush against the lines, which reads as the line
+        "pointing at" a station tile.
+        """
+        self.update_idletasks()
+        pad = int(round(18 * self._get_window_scaling()))
+        for idx, weight in enumerate(sector_weights):
+            minsize = pad + max(
+                self._top_inners[idx].winfo_reqwidth(),
+                self._bottom_inners[idx].winfo_reqwidth(),
+            )
+            for frame in self._sector_row_frames:
+                frame.grid_columnconfigure(idx, weight=weight, minsize=minsize)
+
+    def _place_separators(self, _event=None) -> None:
+        # grid_bbox(col, 0)[0] is the real left edge of column `col` after
+        # layout — i.e. the boundary between sectors col-1 and col. Re-runs
+        # on every <Configure> of the pond frame AND once shortly after the
+        # dialog is shown (grid_bbox can be stale at the first <Configure>,
+        # before Tk's idle-time grid pass ran for the final window size —
+        # and the pond frame's fixed outer size means no later <Configure>
+        # would arrive to correct it). Placing at the same coords is an
+        # idempotent no-op.
+        try:
+            if not self.winfo_exists():
+                return
+            for idx, sep in enumerate(self._separators, start=1):
+                bbox = self._pond_frame.grid_bbox(idx, 0)
+                if not bbox or bbox[2] <= 0:
+                    continue
+                sep.place(x=bbox[0], y=0, relheight=1.0, anchor="n")
+        except TclError:
+            pass
 
     def _create_station_button(self, parent, key: tuple[str, int]) -> ctk.CTkButton:
         _, station = key

@@ -2,7 +2,6 @@ from app.services.sector_service import load_venue_config
 from app.ui.balance_sectors_dialog import (
     _format_distribution,
     compute_resulting_sizes,
-    compute_separator_positions,
     split_stations_to_banks,
 )
 
@@ -83,37 +82,6 @@ class TestFormatDistribution:
     def test_missing_sector_renders_as_zero(self):
         sizes = {"A": 7, "B": 8}
         assert _format_distribution(sizes, ["D", "C", "B", "A"]) == "D=0 C=0 B=8 A=7"
-
-
-class TestComputeSeparatorPositions:
-    def test_lasomin_full_house_proportional(self):
-        # D-C-B-A = 9-9-8-8 → cumulative 9, 18, 26 of total 34
-        positions = compute_separator_positions([9, 9, 8, 8])
-        assert positions == [9 / 34, 18 / 34, 26 / 34]
-
-    def test_lasomin_after_variant_2_override(self):
-        # After 13 moved from C to D: D=10, C=8, B=8, A=8
-        positions = compute_separator_positions([10, 8, 8, 8])
-        assert positions == [10 / 34, 18 / 34, 26 / 34]
-
-    def test_stawy_equal_sectors_unchanged(self):
-        # Stawy has 5 equal sectors of 10 → 0.2, 0.4, 0.6, 0.8 (same as before refactor)
-        positions = compute_separator_positions([10, 10, 10, 10, 10])
-        assert positions == [0.2, 0.4, 0.6, 0.8]
-
-    def test_single_sector_no_separators(self):
-        assert compute_separator_positions([34]) == []
-
-    def test_empty_returns_empty(self):
-        assert compute_separator_positions([]) == []
-
-    def test_zero_total_returns_empty(self):
-        # Defensive: all sectors empty (degenerate config) → no division-by-zero.
-        assert compute_separator_positions([0, 0, 0]) == []
-
-    def test_two_sectors(self):
-        positions = compute_separator_positions([3, 7])
-        assert positions == [0.3]
 
 
 class TestSplitStationsToBanksLasomin:
