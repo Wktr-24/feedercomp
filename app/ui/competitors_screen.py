@@ -206,6 +206,14 @@ class CompetitorsScreen(ctk.CTkFrame):
 
         conn = self.app.get_connection()
         try:
+            if competitor_repo.name_exists(conn, self.app.competition_id, name):
+                messagebox.showwarning(
+                    "Duplikat",
+                    f"Zawodnik '{name}' już istnieje na liście.\n"
+                    "Nie można dodać dwóch zawodników o tym samym imieniu i nazwisku.",
+                    parent=self,
+                )
+                return
             competitors = competitor_repo.get_all(conn, self.app.competition_id)
             list_number = max((c.list_number for c in competitors), default=0) + 1
         finally:

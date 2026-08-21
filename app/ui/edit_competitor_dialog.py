@@ -77,10 +77,32 @@ class EditCompetitorDialog(FeederCompDialog):
 
     def _on_save(self):
         from tkinter import messagebox
+
+        from app.utils import name_key
         full_name = normalize_whitespace(self.name_entry.get())
         if not full_name:
             messagebox.showwarning("Błąd", "Imię i nazwisko nie może być puste.", parent=self)
             return
+        # Renaming onto another competitor's name is refused; the guard only
+        # fires when the name actually changed, so legacy rows that happen to
+        # duplicate can still be saved untouched (and fixed one at a time).
+        if name_key(full_name) != name_key(self.original_name):
+            conn = self.app.get_connection()
+            try:
+                duplicate = competitor_repo.name_exists(
+                    conn, self.app.competition_id, full_name,
+                    exclude_competitor_id=self.competitor.id,
+                )
+            finally:
+                conn.close()
+            if duplicate:
+                messagebox.showwarning(
+                    "Duplikat",
+                    f"Zawodnik '{full_name}' już istnieje na liście.\n"
+                    "Nie można mieć dwóch zawodników o tym samym imieniu i nazwisku.",
+                    parent=self,
+                )
+                return
         phone = self.phone_entry.get().strip() or None
         if phone and (len(phone) != 9 or not phone.isdigit()):
             messagebox.showwarning("Błąd", "Numer telefonu musi mieć dokładnie 9 cyfr.", parent=self)

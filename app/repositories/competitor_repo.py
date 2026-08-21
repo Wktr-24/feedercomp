@@ -1,6 +1,7 @@
 import sqlite3
 
 from app.models.competitor import Competitor
+from app.utils import name_key
 
 _COLUMNS = (
     "id, competition_id, list_number, full_name, phone, payment_status, "
@@ -99,6 +100,28 @@ def update_rankings(
     conn.execute(
         "UPDATE competitors SET sector_place = ?, sector_points = ?, final_place = ? WHERE id = ?",
         (sector_place, sector_points, final_place, competitor_id),
+    )
+
+
+def name_exists(
+    conn: sqlite3.Connection,
+    competition_id: int,
+    full_name: str,
+    exclude_competitor_id: int | None = None,
+) -> bool:
+    """True when a competitor with the same name (per utils.name_key —
+    whitespace/case-insensitive) already exists in this competition.
+    Comparison happens in Python: SQLite's LIKE is case-insensitive for
+    ASCII only, so Polish diacritics would slip through an SQL check."""
+    key = name_key(full_name)
+    rows = conn.execute(
+        "SELECT id, full_name FROM competitors WHERE competition_id = ?",
+        (competition_id,),
+    ).fetchall()
+    return any(
+        name_key(row["full_name"]) == key
+        for row in rows
+        if row["id"] != exclude_competitor_id
     )
 
 

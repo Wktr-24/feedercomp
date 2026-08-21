@@ -165,3 +165,54 @@ class TestDeleteRenumber:
         db.commit()
 
         assert _numbers(db, comp_id) == [1]
+
+
+class TestNameExists:
+    def test_exact_duplicate(self, db):
+        comp_id = _make_competition(db)
+        competitor_repo.add(db, comp_id, 1, "Jan Kowalski")
+        db.commit()
+        assert competitor_repo.name_exists(db, comp_id, "Jan Kowalski") is True
+
+    def test_case_insensitive(self, db):
+        comp_id = _make_competition(db)
+        competitor_repo.add(db, comp_id, 1, "Jan Kowalski")
+        db.commit()
+        assert competitor_repo.name_exists(db, comp_id, "JAN KOWALSKI") is True
+
+    def test_polish_diacritics_case_insensitive(self, db):
+        # SQLite LIKE would miss this pair — the check must run in Python.
+        comp_id = _make_competition(db)
+        competitor_repo.add(db, comp_id, 1, "Łukasz Żółty")
+        db.commit()
+        assert competitor_repo.name_exists(db, comp_id, "łukasz żółty") is True
+
+    def test_whitespace_insensitive(self, db):
+        comp_id = _make_competition(db)
+        competitor_repo.add(db, comp_id, 1, "Jan Kowalski")
+        db.commit()
+        assert competitor_repo.name_exists(db, comp_id, "  Jan   Kowalski ") is True
+
+    def test_different_name_false(self, db):
+        comp_id = _make_competition(db)
+        competitor_repo.add(db, comp_id, 1, "Jan Kowalski")
+        db.commit()
+        assert competitor_repo.name_exists(db, comp_id, "Jan Nowak") is False
+
+    def test_exclude_self(self, db):
+        comp_id = _make_competition(db)
+        cid = competitor_repo.add(db, comp_id, 1, "Jan Kowalski")
+        db.commit()
+        # Saving a competitor under their own (unchanged) name is not a duplicate.
+        assert competitor_repo.name_exists(
+            db, comp_id, "Jan Kowalski", exclude_competitor_id=cid,
+        ) is False
+
+    def test_scoped_per_competition(self, db):
+        # Day 2 of a final copies the same names into ANOTHER competition —
+        # uniqueness is per-competition by design.
+        comp1 = _make_competition(db)
+        comp2 = _make_competition(db)
+        competitor_repo.add(db, comp1, 1, "Jan Kowalski")
+        db.commit()
+        assert competitor_repo.name_exists(db, comp2, "Jan Kowalski") is False

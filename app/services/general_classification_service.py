@@ -30,7 +30,7 @@ from typing import Optional
 
 from app.models.competition import Competition
 from app.repositories import competition_repo, competitor_repo
-from app.utils import normalize_whitespace
+from app.utils import name_key
 
 
 @dataclass
@@ -70,10 +70,6 @@ def resolve_linked_pair(
     return comp, day2
 
 
-def _normalize(name: str) -> str:
-    return normalize_whitespace(name).casefold()
-
-
 def _participants_by_key(conn, competition_id):
     """Map normalized name -> competitor for everyone who took part that day.
     Second return value: display names of keys that appear more than once."""
@@ -82,7 +78,7 @@ def _participants_by_key(conn, competition_id):
     for c in competitor_repo.get_all(conn, competition_id):
         if c.sector_name is None or c.sector_points is None:
             continue
-        key = _normalize(c.full_name)
+        key = name_key(c.full_name)
         if key in by_key:
             duplicate_display.setdefault(key, by_key[key].full_name)
         else:

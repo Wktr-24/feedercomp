@@ -44,6 +44,16 @@ def set_window_icon(window) -> None:
         pass
 
 
+def name_key(text: str) -> str:
+    """Canonical identity key for a competitor name: whitespace-normalized
+    and case-folded. Used both for duplicate detection within a competition
+    and for pairing competitors across the two days of a final — the two
+    must agree, or a name the duplicate guard allows could still be
+    ambiguous to the pairing logic.
+    """
+    return normalize_whitespace(text).casefold()
+
+
 def normalize_whitespace(text: str) -> str:
     """Collapse multiple whitespace to single space and strip edges.
 
