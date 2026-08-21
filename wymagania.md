@@ -24,6 +24,7 @@ Program do zarządzania zawodami wędkarskimi (spinning) organizowanymi przez kl
 - Wiele łowisk (profile):
   - **Stawy Siedleckie** — 50 stanowisk, 5 sektorów (A-E)
   - **Lasomin** — 34 stanowiska, 4 sektory
+  - **Stawy Siedleckie — Finał** — 50 stanowisk, 6 sektorów (A-F); układ używany wyłącznie na finał dwudniowy (patrz §I)
 - Mapowanie numerów stanowisk do sektorów (stałe dla łowiska, ale edytowalne):
   - Przykład Stawy Siedleckie:
     - Sektor A: 1-5 i 46-50
@@ -96,6 +97,47 @@ Cel:
 - Sezon = ok. 6 zawodów (4× Stawy Siedleckie, 2× Lasomin)
 - Finał dwudniowy we wrześniu
 
+### I. Finał dwudniowy (reguły ustalone 2026-08-20/21, telefonicznie z organizatorem)
+
+**Układ łowiska:** finał rozgrywany na Stawach Siedleckich w specjalnym układzie
+6 sektorów (venue "Stawy Siedleckie — Finał", 8/8/9/8/8/9 zawodników w sektorach
+A/B/C/D/E/F). Numeracja fizyczna stanowisk bez zmian (góra 1-25 od prawej,
+dół 26-50 od lewej):
+
+- Sektor A: 1-4 i 47-50 (8)
+- Sektor B: 5-8 i 43-46 (8)
+- Sektor C: 9-13 i 39-42 (9)
+- Sektor D: 14-17 i 35-38 (8)
+- Sektor E: 18-21 i 31-34 (8)
+- Sektor F: 22-30 (9)
+
+**Organizacja dni:** dzień 1 i dzień 2 to dwie osobne konkurencje w programie,
+połączone linkiem. Dzień 2 tworzy się przyciskiem "Dzień 2" — kopiuje listę
+zawodników (bez obecności, stanowisk i wag). Każdy dzień ma własne losowanie,
+wagi i klasyfikację dzienną — dokładnie jak zwykłe zawody.
+
+**Strefy (dzień 2: zamiana ABC↔DEF)** — POZA programem. Organizator realizuje
+je dwoma woreczkami do losowania; dla programu drugi dzień to zwykłe losowanie.
+
+**Klasyfikacja generalna (liczy program):**
+
+1. Uczestnik = zawodnik, który brał udział w OBU dniach (miał przydzielone
+   stanowisko). Obecny tylko jeden dzień → całkowicie pomijany
+   ("taka osoba nas nie interesuje" — decyzja organizatora).
+2. Parowanie między dniami po imieniu i nazwisku (bez rozróżniania wielkości
+   liter i nadmiarowych spacji).
+3. Sortowanie: suma punktów sektorowych z dwóch dni rosnąco, przy remisie
+   suma wag z dwóch dni malejąco.
+4. Pełny remis (punkty + waga) → wspólne miejsce, styl 1, 2, 2, 4.
+5. Suma wag = 0 (nic w oba dni) → brak miejsca, „-", na końcu listy.
+6. Duplikaty nazwisk w obrębie dnia → wykluczone z klasyfikacji + widoczne
+   ostrzeżenie (nigdy ciche błędne parowanie). Uwaga: program nie pozwala
+   tworzyć duplikatów nazwisk w ramach jednych zawodów, więc dotyczy to tylko
+   ewentualnych danych historycznych.
+
+**Wydruk:** PDF "Klasyfikacja generalna" z nagłówkiem obejmującym obie daty
+(kolumny: miejsce, nazwisko, pkt dzień 1, pkt dzień 2, suma pkt, suma wag).
+
 ---
 
 ## Encje danych
@@ -163,10 +205,12 @@ Cel:
 5. ~~**Aplikacja offline**~~ → tak, desktopowa offline
 6. ~~**Platforma**~~ → Windows 10 i Windows 11, maksymalna kompatybilność i prostota
 7. ~~**Klasyfikacja roczna**~~ → nie istnieje (brak w danych i transkrypcji)
+8. ~~**Finał dwudniowy**~~ → reguły ustalone telefonicznie 2026-08-20/21, opisane w §I (suma punktów z 2 dni, remis → suma wag, tylko obecni w obu dniach)
+9. ~~**Duplikaty nazwisk**~~ → niemożliwe do utworzenia (blokada przy dodawaniu i edycji); ryzyko dwóch osób o identycznym imieniu i nazwisku celowo zignorowane
 
 ## Odroczone pytania
 
-1. **Finał dwudniowy**: Jak agregować wyniki z dwóch dni? Nie jest priorytetem — pierwsze zawody będą jednodniowe. Informacje zostaną dostarczone później.
+(brak)
 
 ---
 

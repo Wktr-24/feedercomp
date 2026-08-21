@@ -8,7 +8,8 @@ Program desktopowy do zarządzania zawodami wędkarskimi (spinning) dla klubu WK
 - Rejestracja wylosowanych stanowisk → automatyczne przypisanie do sektora
 - Wpisywanie wag ryb z wyszukiwaniem po nazwisku
 - Automatyczna klasyfikacja (miejsca sektorowe → klasyfikacja końcowa)
-- Generowanie PDF (klasyfikacja, lista zwycięzców, arkusze sektorów)
+- Finał dwudniowy — utworzenie dnia 2 z kopiowaniem listy zawodników i klasyfikacja generalna z sumy dwóch dni
+- Generowanie PDF (klasyfikacja, lista zwycięzców, arkusze sektorów, klasyfikacja generalna)
 - Drukowanie wyników na przenośnej drukarce
 
 ## Dla taty — uruchamianie
@@ -17,7 +18,7 @@ Plik `FeederComp.exe` — kliknij dwukrotnie. Nie wymaga instalacji.
 
 Dane zapisują się automatycznie w `%APPDATA%\FeederComp\data.db` — przetrwają aktualizację programu.
 
-Predefiniowane łowiska: Stawy Siedleckie (50 stanowisk, 5 sektorów) i Lasomin (34 stanowiska).
+Predefiniowane łowiska: Stawy Siedleckie (50 stanowisk, 5 sektorów), Lasomin (34 stanowiska) i Stawy Siedleckie — Finał (50 stanowisk, 6 sektorów — układ na finał dwudniowy).
 
 ## Dla developera — budowanie .exe
 
