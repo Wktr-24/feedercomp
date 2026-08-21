@@ -84,7 +84,7 @@ def _seed_default_venues(conn: sqlite3.Connection) -> None:
     if count > 0:
         return
 
-    with open(_SEED_DATA_PATH) as f:
+    with open(_SEED_DATA_PATH, encoding="utf-8") as f:
         data = json.load(f)
 
     for venue_data in data["venues"]:
@@ -116,7 +116,7 @@ def _migrate_lasomin_sectors(conn: sqlite3.Connection) -> None:
     ).fetchone()[0]
     if has_sectors > 0:
         return
-    with open(_SEED_DATA_PATH) as f:
+    with open(_SEED_DATA_PATH, encoding="utf-8") as f:
         data = json.load(f)
     lasomin = next((v for v in data["venues"] if v["name"] == "Lasomin"), None)
     if not lasomin:
