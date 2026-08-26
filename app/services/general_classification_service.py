@@ -113,11 +113,17 @@ def calculate(
 
     # Names present on exactly one day (after duplicate removal) — omitted
     # from the table per the organizer's rule, but reported so a typo can't
-    # silently reshuffle the standings.
-    unpaired_keys = set(day1_by_key) ^ set(day2_by_key)
-    unpaired_names = sorted(
-        (day1_by_key.get(k) or day2_by_key[k]).full_name for k in unpaired_keys
-    )
+    # silently reshuffle the standings. Only meaningful once BOTH days have
+    # participants: before day 2's draw the whole day-1 roster is technically
+    # unpaired, and a red wall of 50 names on the evening of day 1 would be
+    # a false alarm that teaches the operator to ignore the warning.
+    if day1_count and day2_count:
+        unpaired_keys = set(day1_by_key) ^ set(day2_by_key)
+        unpaired_names = sorted(
+            (day1_by_key.get(k) or day2_by_key[k]).full_name for k in unpaired_keys
+        )
+    else:
+        unpaired_names = []
 
     rows: list[GeneralRow] = []
     for key, c1 in day1_by_key.items():

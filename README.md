@@ -18,6 +18,12 @@ Plik `FeederComp.exe` — kliknij dwukrotnie. Nie wymaga instalacji.
 
 Dane zapisują się automatycznie w `%APPDATA%\FeederComp\data.db` — przetrwają aktualizację programu.
 
+**Kopie zapasowe:** przy każdym uruchomieniu program robi kopię bazy do `%APPDATA%\FeederComp\backups\` (trzymane jest 20 ostatnich). Żeby przywrócić dane po pomyłce: zamknij program, skopiuj wybrany plik `backups\data-<data>-<godzina>.db` w miejsce `data.db`, uruchom ponownie.
+
+**Błędy:** jeśli program pokaże okno "Błąd programu", szczegóły są dopisywane do `%APPDATA%\FeederComp\error.log` — ten plik wystarczy wysłać do autora.
+
+**Wydruki PDF** trafiają do folderu `FeederComp` w katalogu tymczasowym (`%TEMP%\FeederComp`), z datą i godziną w nazwie pliku; arkusze sektorów z jednego wydruku lądują w osobnym podfolderze.
+
 Predefiniowane łowiska: Stawy Siedleckie (50 stanowisk, 5 sektorów), Lasomin (34 stanowiska) i Stawy Siedleckie — Finał (50 stanowisk, 6 sektorów — układ na finał dwudniowy).
 
 ## Dla developera — budowanie .exe

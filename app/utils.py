@@ -54,7 +54,27 @@ def name_key(text: str) -> str:
     combining-diacritic spellings (e.g. "ó" vs "o"+U+0301) into one key so a
     name pasted from another source still pairs.
     """
+    # (NFC first, then casefold — the fold of exotic codepoints can emit
+    # non-NFC output, but both sides of every comparison fold identically,
+    # so pairing is unaffected.)
     return unicodedata.normalize("NFC", normalize_whitespace(text)).casefold()
+
+
+def parse_strict_iso_date(text: str):
+    """Parse a date accepting ONLY the canonical YYYY-MM-DD form; None otherwise.
+
+    Both datetime.strptime("%Y-%m-%d") and date.fromisoformat are laxer than
+    they look: strptime accepts unpadded "2026-9-5", and fromisoformat (3.11+)
+    accepts "20260905" and week dates like "2026-W36-1". Any such value stored
+    in competitions.date breaks date-DESC sorting and the PDF date formatting,
+    so validate by round-trip.
+    """
+    from datetime import date
+    try:
+        parsed = date.fromisoformat(text)
+    except ValueError:
+        return None
+    return parsed if parsed.isoformat() == text else None
 
 
 def normalize_whitespace(text: str) -> str:

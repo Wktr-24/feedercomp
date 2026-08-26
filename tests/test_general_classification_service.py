@@ -158,6 +158,25 @@ class TestParticipationFilter:
         assert result.unpaired_names == ["Bez Stanowiska"]
 
 
+class TestUnpairedSuppression:
+    def test_no_false_alarm_before_day2_draw(self, db):
+        # Day 2 created (roster copied) but nobody has drawn a station yet —
+        # the evening of day 1. The whole day-1 roster is technically
+        # unpaired, but reporting it would be a false alarm.
+        day1, _ = _setup_day(db, "2026-09-05", None, {
+            "A": [(1, "Adam", 3000), (2, "Beata", 2000)],
+        })
+        day2, _ = _setup_day(db, "2026-09-06", None, {}, linked_to=day1)
+        competitor_repo.add(db, day2, 1, "Adam")
+        competitor_repo.add(db, day2, 2, "Beata")
+        db.commit()
+
+        result = calculate(db, day1, day2)
+        assert result.rows == []
+        assert result.unpaired_names == []
+        assert (result.day1_count, result.day2_count) == (2, 0)
+
+
 class TestNameMatching:
     def test_whitespace_and_case_insensitive_pairing(self, db):
         day1, _ = _setup_day(db, "2026-09-05", None, {

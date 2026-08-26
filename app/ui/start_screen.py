@@ -1,10 +1,10 @@
-from datetime import date, datetime
+from datetime import date
 from tkinter import messagebox
 
 import customtkinter as ctk
 
 from app.repositories import venue_repo, competition_repo
-from app.utils import normalize_whitespace
+from app.utils import normalize_whitespace, parse_strict_iso_date
 
 
 class StartScreen(ctk.CTkFrame):
@@ -155,9 +155,9 @@ class StartScreen(ctk.CTkFrame):
         if not comp_date:
             messagebox.showwarning("Błąd", "Podaj datę.")
             return
-        try:
-            datetime.strptime(comp_date, "%Y-%m-%d")
-        except ValueError:
+        # Strict form only — strptime would accept unpadded "2026-9-5",
+        # which breaks date-DESC sorting of the competitions list.
+        if parse_strict_iso_date(comp_date) is None:
             messagebox.showwarning("Błąd", "Nieprawidłowy format daty. Użyj RRRR-MM-DD.")
             return
 

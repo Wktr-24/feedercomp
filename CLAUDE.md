@@ -92,7 +92,25 @@ build.bat
 - Brak obsługi remisów wagowych przy wadze > 0 (scenariusz uznany za nieosiągalny)
 - `config.get_bundle_dir()` — używać zamiast `__file__` do lokalizacji plików (kompatybilność z PyInstaller)
 
-## Co jeszcze nie zrobione
+## Backlog v0.5.0 (z review v0.4.0 — nieblokujące, świadomie odłożone)
 
-- (nic odroczonego — finał dwudniowy i Lasomin zaimplementowane; migracja na
-  `schema_migrations` table dopiero przy trzeciej migracji w `database.py`)
+- Tabela `schema_migrations` + procedura baseline — warunek ("przy trzeciej
+  migracji") już spełniony: w `database.py` są 3 funkcje `_migrate_*`
+- Partial UNIQUE index na `competitions.linked_competition_id` (musi lądować
+  PO ALTER-ze, nie w `_SCHEMA`) — razem z powyższym
+- Rozdział `utils.py` na czyste helpery tekstowe vs kod Tk/Win32 (repozytoria
+  zależą dziś tranzytywnie od części UI-owej)
+- Geometria sektorów (`compute_resulting_sizes`, `split_stations_to_banks`,
+  `_format_distribution`) z modułu UI do `sector_service` (testy przestaną
+  importować customtkinter)
+- Dedup logiki wykrywania duplikatów po `name_key` (3 implementacje:
+  `name_exists`, `create_day2`, `_participants_by_key`)
+- Raport duplikatów z numerami listy ("Jan Kowalski (nr 12, 37)")
+- Retencja/porządkowanie starych PDF-ów w `%TEMP%\FeederComp`
+- Inwarianty do pilnowania: mutacje linku dnia 1↔2 wyłącznie z ekranu
+  startowego (cache `_linked_pair` w ResultsScreen na tym polega); migracje
+  kluczują po NAZWACH łowisk — nie dodawać edycji nazwy venue bez przemyślenia;
+  `build.bat` buduje z flag CLI (checked-in `FeederComp.spec` to artefakt,
+  nie źródło prawdy)
+- Konwencja serwisów: funkcje modułowe; klasa tylko przy stanie
+  (`PrintService`) lub wstrzykniętej zależności (`RankingService`)

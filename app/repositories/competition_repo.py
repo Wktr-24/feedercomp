@@ -29,7 +29,9 @@ def create(
 
 def get_all(conn: sqlite3.Connection) -> list[Competition]:
     rows = conn.execute(
-        f"SELECT {_COLUMNS} FROM competitions ORDER BY date DESC"
+        # Secondary id key: keeps same-date rows (day 1 + day 2 of a final
+        # after the user accepted an equal-date warning) in a stable order.
+        f"SELECT {_COLUMNS} FROM competitions ORDER BY date DESC, id DESC"
     ).fetchall()
     return [Competition(**row) for row in rows]
 

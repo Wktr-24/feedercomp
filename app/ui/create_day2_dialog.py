@@ -5,7 +5,7 @@ import customtkinter as ctk
 
 from app.services.competition_service import Day2Error, create_day2
 from app.ui.base_dialog import FeederCompDialog
-from app.utils import normalize_whitespace
+from app.utils import normalize_whitespace, parse_strict_iso_date
 
 _DAY2_ERROR_MESSAGES = {
     "source_missing": "Zawody źródłowe nie istnieją.",
@@ -72,11 +72,8 @@ class CreateDay2Dialog(FeederCompDialog):
         if not comp_date:
             messagebox.showwarning("Błąd", "Podaj datę.", parent=self)
             return
-        try:
-            # fromisoformat also rejects unpadded forms like "2026-9-5",
-            # which strptime would accept and which break date-DESC sorting.
-            parsed = date.fromisoformat(comp_date)
-        except ValueError:
+        parsed = parse_strict_iso_date(comp_date)
+        if parsed is None:
             messagebox.showwarning(
                 "Błąd", "Nieprawidłowy format daty. Użyj RRRR-MM-DD.", parent=self,
             )

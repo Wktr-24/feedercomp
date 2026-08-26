@@ -336,11 +336,19 @@ class BalanceSectorsDialog(FeederCompDialog):
         try:
             if not self.winfo_exists():
                 return
+            self._sep_after_id = None
             for idx, sep in enumerate(self._separators, start=1):
                 bbox = self._pond_frame.grid_bbox(idx, 0)
                 if not bbox or bbox[2] <= 0:
                     continue
-                sep.place(x=bbox[0], y=0, relheight=1.0, anchor="n")
+                # grid_bbox returns physical pixels, but CTk's place() runs
+                # x through _apply_argument_scaling (× widget_scaling) — at
+                # 125% DPI a raw x would land 1.25× too far right. Divide by
+                # the widget scaling so the round-trip is identity.
+                sep.place(
+                    x=bbox[0] / sep._get_widget_scaling(),
+                    y=0, relheight=1.0, anchor="n",
+                )
         except TclError:
             pass
 

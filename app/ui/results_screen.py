@@ -148,9 +148,11 @@ class ResultsScreen(ctk.CTkFrame):
         self.general_info.pack(fill="x", padx=5, pady=(0, 0))
 
         # Populated when ambiguous (duplicated) or unpaired names had to be
-        # excluded from the classification.
+        # excluded from the classification. wraplength + left anchor: a long
+        # name list must wrap, not get center-truncated on both sides.
         self.general_warning = ctk.CTkLabel(
             tab, text="", font=("Segoe UI", 13, "bold"), text_color="#C0392B",
+            anchor="w", justify="left", wraplength=850,
         )
         self.general_warning.pack(fill="x", padx=5, pady=(0, 2))
 
@@ -473,11 +475,13 @@ class ResultsScreen(ctk.CTkFrame):
             comp, venue = self._get_comp_and_venue(conn)
             sector_names = venue_repo.get_sector_names(conn, self.app.venue_id)
             ps = PrintService()
+            run_dir = ps.new_print_run_dir("Sektory")
             paths = []
             for sector_name in sector_names:
                 path = ps.generate_sector_pdf(
                     conn, self.app.competition_id, sector_name,
                     venue.name, comp.date, comp.name,
+                    run_dir=run_dir,
                 )
                 paths.append(path)
             if paths:

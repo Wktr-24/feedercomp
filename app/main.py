@@ -1,4 +1,4 @@
-import shutil
+import sqlite3
 import time
 import traceback
 from datetime import datetime
@@ -12,13 +12,19 @@ from app.database import init_db
 from app.ui.app_window import AppWindow
 from app.utils import UNMAP_GRACE_SECONDS, set_window_icon
 
-_BACKUPS_TO_KEEP = 5
+# 20 launches of history (~85 KB each): a two-day final easily sees a dozen
+# restarts, and 5 would rotate the pre-incident snapshot away within an hour.
+_BACKUPS_TO_KEEP = 20
+
+_ERROR_LOG_PATH = get_data_dir() / "error.log"
 
 
 def _backup_database(db_path: Path) -> None:
-    """Copy data.db to backups/data-<timestamp>.db on every launch, keeping
-    the newest few. A single mis-click (deleting day 1 of a two-day final
-    cascades all its competitors) is otherwise unrecoverable in the field.
+    """Snapshot data.db to backups/data-<timestamp>.db on every launch,
+    keeping the newest _BACKUPS_TO_KEEP. A single mis-click (deleting day 1
+    of a two-day final cascades all its competitors) is otherwise
+    unrecoverable in the field. Uses SQLite's backup API instead of a file
+    copy so a hot journal left by a crash is folded in consistently.
     Best-effort — a failed backup must never block startup."""
     if not db_path.exists():
         return
@@ -26,10 +32,35 @@ def _backup_database(db_path: Path) -> None:
         backup_dir = db_path.parent / "backups"
         backup_dir.mkdir(exist_ok=True)
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        shutil.copy2(db_path, backup_dir / f"data-{stamp}.db")
-        for old in sorted(backup_dir.glob("data-*.db"))[:-_BACKUPS_TO_KEEP]:
+        src = sqlite3.connect(str(db_path))
+        try:
+            dst = sqlite3.connect(str(backup_dir / f"data-{stamp}.db"))
+            try:
+                src.backup(dst)
+            finally:
+                dst.close()
+        finally:
+            src.close()
+        # Prune only files matching the timestamp shape — a hand-made copy
+        # like data-przed-finalem.db must never take part in the rotation.
+        stamped = sorted(backup_dir.glob("data-????????-??????.db"))
+        for old in stamped[:-_BACKUPS_TO_KEEP]:
             old.unlink()
-    except OSError:
+    except (OSError, sqlite3.Error):
+        pass
+
+
+def _log_exception(exc_type, exc_value, exc_tb) -> None:
+    try:
+        with open(_ERROR_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(
+                f"\n--- {datetime.now().isoformat(timespec='seconds')} "
+                f"(FeederComp {__version__}) ---\n"
+            )
+            traceback.print_exception(exc_type, exc_value, exc_tb, file=f)
+    except Exception:
+        # Even a hostile __str__ on the exception must not re-raise here —
+        # that would restore the silent-failure mode this exists to remove.
         pass
 
 
@@ -37,26 +68,25 @@ def _install_exception_handler(root) -> None:
     """The production build is windowed (no console), so an unhandled
     exception in a Tk callback would otherwise die silently — a button that
     'does nothing' with no trace. Log to error.log and tell the user where
-    the details are."""
-    log_path = get_data_dir() / "error.log"
+    the details are. The messagebox shows at most once per session: a
+    repeating exception in an event handler (<Configure>, after-loops) would
+    otherwise stack modal boxes faster than they can be closed."""
+    shown = {"box": False}
 
     def _handler(exc_type, exc_value, exc_tb):
-        try:
-            with open(log_path, "a", encoding="utf-8") as f:
-                f.write(
-                    f"\n--- {datetime.now().isoformat(timespec='seconds')} "
-                    f"(FeederComp {__version__}) ---\n"
-                )
-                traceback.print_exception(exc_type, exc_value, exc_tb, file=f)
-        except OSError:
-            pass
+        _log_exception(exc_type, exc_value, exc_tb)
+        if shown["box"]:
+            return
+        shown["box"] = True
         try:
             from tkinter import messagebox
             messagebox.showerror(
                 "Błąd programu",
                 "Wystąpił nieoczekiwany błąd:\n"
                 f"{exc_type.__name__}: {exc_value}\n\n"
-                f"Szczegóły zapisano w pliku:\n{log_path}",
+                f"Szczegóły zapisano w pliku:\n{_ERROR_LOG_PATH}\n\n"
+                "(Kolejne błędy w tej sesji będą zapisywane tylko do pliku.)",
+                parent=root.grab_current() or root,
             )
         except Exception:
             pass
@@ -65,6 +95,19 @@ def _install_exception_handler(root) -> None:
 
 
 def main():
+    # Startup crashes (a bad migration, a corrupted DB, missing bundle data)
+    # happen before Tk exists, so report_callback_exception can't see them.
+    # PyInstaller's windowed bootloader shows its own traceback box, but
+    # nothing would be written to error.log — log here, then re-raise.
+    try:
+        _run()
+    except Exception:
+        import sys
+        _log_exception(*sys.exc_info())
+        raise
+
+
+def _run():
     db_path = get_db_path()
     _backup_database(db_path)
     init_db(db_path)

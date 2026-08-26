@@ -41,6 +41,14 @@ class PrintService:
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         return self.output_dir / f"{base_name}_{stamp}.pdf"
 
+    def new_print_run_dir(self, prefix: str) -> Path:
+        """Fresh dated subfolder for a multi-file print run (sector sheets).
+        Opening the run folder shows the operator exactly this run's files —
+        not an archive of a dozen near-identical PDFs from earlier reprints."""
+        run_dir = self.output_dir / f"{prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        run_dir.mkdir(exist_ok=True)
+        return run_dir
+
     @staticmethod
     def _format_display_date(comp_date: str) -> str:
         try:
@@ -104,11 +112,17 @@ class PrintService:
         ])
 
     def generate_sector_pdf(self, conn, competition_id: int, sector_name: str,
-                            venue_name: str, comp_date: str, comp_name: str | None) -> Path:
+                            venue_name: str, comp_date: str, comp_name: str | None,
+                            run_dir: Path | None = None) -> Path:
         from app.repositories import competitor_repo
 
         safe_sector = re.sub(r'[^A-Za-z0-9_-]', '_', sector_name)
-        filepath = self._timestamped_path(f"Sektor_{safe_sector}")
+        if run_dir is not None:
+            # Inside a dated run folder the filenames stay clean (Sektor_A.pdf)
+            # — the folder itself carries the timestamp.
+            filepath = run_dir / f"Sektor_{safe_sector}.pdf"
+        else:
+            filepath = self._timestamped_path(f"Sektor_{safe_sector}")
         doc = SimpleDocTemplate(str(filepath), pagesize=A4,
                                 leftMargin=15*mm, rightMargin=15*mm,
                                 topMargin=15*mm, bottomMargin=15*mm)
