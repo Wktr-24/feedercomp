@@ -1,4 +1,5 @@
 import os
+from tkinter import font as tkfont
 from tkinter import messagebox, ttk
 
 import customtkinter as ctk
@@ -147,9 +148,9 @@ class ResultsScreen(ctk.CTkFrame):
         )
         self.general_info.pack(fill="x", padx=5, pady=(0, 0))
 
-        # Populated when ambiguous (duplicated) or unpaired names had to be
-        # excluded from the classification. wraplength + left anchor: a long
-        # name list must wrap, not get center-truncated on both sides.
+        # Populated when ambiguous (duplicated) names had to be excluded
+        # from the classification. wraplength + left anchor: a long name
+        # list must wrap, not get center-truncated on both sides.
         self.general_warning = ctk.CTkLabel(
             tab, text="", font=("Segoe UI", 13, "bold"), text_color="#C0392B",
             anchor="w", justify="left", wraplength=850,
@@ -158,13 +159,25 @@ class ResultsScreen(ctk.CTkFrame):
 
         columns = ("place", "name", "pts1", "pts2", "pts_sum", "weight_kg")
         headings = ("Miejsce", "Imię i Nazwisko", "Pkt dzień 1", "Pkt dzień 2", "Suma pkt", "Waga (kg)")
-        widths = (60, 250, 90, 90, 80, 100)
+        # The place column must hold the literal "DYSKWALIFIKACJA" at the
+        # actual Treeview font, and every other column must hold its
+        # heading at the bold heading font (pixel sizes depend on DPI).
+        # Treeview clips overflowing text, and stretch can shrink a column
+        # below its configured width at small window sizes — measure and
+        # pin minwidths so any deficit lands on the name column (widest,
+        # left-anchored data), never on the headings or the DQ label.
+        cell_font = tkfont.Font(font=ttk.Style().lookup("Treeview", "font"))
+        heading_font = tkfont.Font(font=ttk.Style().lookup("Treeview.Heading", "font"))
+        place_width = cell_font.measure("DYSKWALIFIKACJA") + 24
+        widths = (place_width, 250, 90, 90, 80, 100)
         anchors = ("center", "w", "center", "center", "center", "center")
 
         self.general_tree = ttk.Treeview(tab, columns=columns, show="headings", selectmode="browse")
         for col, heading, width, anchor in zip(columns, headings, widths, anchors):
             self.general_tree.heading(col, text=heading)
-            self.general_tree.column(col, width=width, minwidth=40, anchor=anchor)
+            min_w = heading_font.measure(heading) + 12
+            self.general_tree.column(col, width=max(width, min_w), minwidth=min_w, anchor=anchor)
+        self.general_tree.column("place", minwidth=place_width)
 
         scrollbar = ttk.Scrollbar(tab, orient="vertical", command=self.general_tree.yview)
         self.general_tree.configure(yscrollcommand=scrollbar.set)
@@ -250,18 +263,13 @@ class ResultsScreen(ctk.CTkFrame):
                  f"(dzień 1: {result.day1_count}, dzień 2: {result.day2_count})",
         )
 
-        warnings = []
         if result.duplicate_names:
-            warnings.append(
-                "Powtarzające się nazwiska pominięte w klasyfikacji: "
+            self.general_warning.configure(
+                text="Powtarzające się nazwiska pominięte w klasyfikacji: "
                 + ", ".join(result.duplicate_names)
             )
-        if result.unpaired_names:
-            warnings.append(
-                "Tylko w jednym dniu (pominięci): "
-                + ", ".join(result.unpaired_names)
-            )
-        self.general_warning.configure(text="\n".join(warnings))
+        else:
+            self.general_warning.configure(text="")
 
         for i, row in enumerate(result.rows):
             tag = "even" if i % 2 == 0 else "odd"
@@ -272,6 +280,16 @@ class ResultsScreen(ctk.CTkFrame):
                 str(row.points_day2),
                 str(row.total_points),
                 format_weight_kg(row.total_weight_grams),
+            ))
+        for i, row in enumerate(result.disqualified, start=len(result.rows)):
+            tag = "even" if i % 2 == 0 else "odd"
+            self.general_tree.insert("", "end", tags=(tag,), values=(
+                "DYSKWALIFIKACJA",
+                row.full_name,
+                str(row.points_day1) if row.points_day1 is not None else "-",
+                str(row.points_day2) if row.points_day2 is not None else "-",
+                str(row.total_points),
+                format_weight_kg(row.weight_grams),
             ))
 
     def _refresh_name(self, conn):
@@ -514,20 +532,12 @@ class ResultsScreen(ctk.CTkFrame):
             day2 = competition_repo.get_by_id(conn, self._linked_pair[1].id)
             venue = venue_repo.get_by_id(conn, day1.venue_id)
             result = general_classification_service.calculate(conn, day1.id, day2.id)
-            warnings = []
             if result.duplicate_names:
-                warnings.append(
-                    "Powtarzające się nazwiska pominięte w klasyfikacji: "
-                    + ", ".join(result.duplicate_names)
-                )
-            if result.unpaired_names:
-                warnings.append(
-                    "Zawodnicy tylko w jednym dniu (pominięci): "
-                    + ", ".join(result.unpaired_names)
-                )
-            if warnings:
                 messagebox.showwarning(
-                    "Uwaga", "\n\n".join(warnings), parent=self,
+                    "Uwaga",
+                    "Powtarzające się nazwiska pominięte w klasyfikacji: "
+                    + ", ".join(result.duplicate_names),
+                    parent=self,
                 )
             ps = PrintService()
             # day1.name is the natural competition name (without " — dzień 2").

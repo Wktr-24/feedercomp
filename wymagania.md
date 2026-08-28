@@ -122,8 +122,15 @@ je dwoma woreczkami do losowania; dla programu drugi dzień to zwykłe losowanie
 **Klasyfikacja generalna (liczy program):**
 
 1. Uczestnik = zawodnik, który brał udział w OBU dniach (miał przydzielone
-   stanowisko). Obecny tylko jeden dzień → całkowicie pomijany
-   ("taka osoba nas nie interesuje" — decyzja organizatora).
+   stanowisko). Obecny tylko jeden dzień (którykolwiek) → poza klasyfikacją:
+   wiersz "DYSKWALIFIKACJA" na końcu tabeli — nazwisko oraz punkty i waga
+   z dnia, w którym łowił (suma pkt = punkty tego jednego dnia; kolumna
+   brakującego dnia „-"). Między sobą posortowani jak klasyfikacja:
+   suma pkt rosnąco, przy remisie waga malejąco. Reguła z 2026-08-28;
+   wcześniej całkowicie pomijany. Wiersze te pojawiają się dopiero, gdy
+   oba dni mają
+   uczestników z wylosowanym stanowiskiem (bezpiecznik przed fałszywym
+   alarmem wieczorem dnia 1).
 2. Parowanie między dniami po imieniu i nazwisku (bez rozróżniania wielkości
    liter i nadmiarowych spacji).
 3. Sortowanie: suma punktów sektorowych z dwóch dni rosnąco, przy remisie
@@ -131,7 +138,8 @@ je dwoma woreczkami do losowania; dla programu drugi dzień to zwykłe losowanie
 4. Pełny remis (punkty + waga) → wspólne miejsce, styl 1, 2, 2, 4.
 5. Suma wag = 0 (nic w oba dni) → brak miejsca, „-", na końcu listy.
 6. Duplikaty nazwisk w obrębie dnia → wykluczone z klasyfikacji + widoczne
-   ostrzeżenie (nigdy ciche błędne parowanie). Uwaga: program nie pozwala
+   ostrzeżenie (nigdy ciche błędne parowanie); nie pojawiają się też jako
+   wiersze DYSKWALIFIKACJA. Uwaga: program nie pozwala
    tworzyć duplikatów nazwisk w ramach jednych zawodów, więc dotyczy to tylko
    ewentualnych danych historycznych.
 

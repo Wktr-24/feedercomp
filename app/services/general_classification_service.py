@@ -4,10 +4,15 @@ Rules (locked with the organizer, call of 2026-08-20):
   - Day 1 and day 2 are two separate competitions linked via
     competitions.linked_competition_id (day 2 points at day 1).
   - Only competitors who took part in BOTH days are classified; anyone
-    present on a single day is omitted entirely ("taka osoba nas nie
-    interesuje"). "Took part on a day" = has a station/sector assigned
-    (sector_name is not None — the same convention print_service and
-    results_screen use), plus computed sector_points.
+    present on a single day is listed below the classified rows as
+    "DYSKWALIFIKACJA" — with the points and weight of the day they did
+    fish, the missing day rendered "-", total points equal to that single
+    day (organizer's rule of 2026-08-28; previously omitted entirely).
+    Ordered among themselves like the classification: points ascending,
+    ties by weight descending.
+    "Took part on a day" = has a station/sector assigned (sector_name is
+    not None — the same convention print_service and results_screen use),
+    plus computed sector_points.
   - Rank by total sector points (both days) ascending, ties broken by
     total weight (both days) descending; full ties share a place,
     competition-style 1, 2, 2, 4.
@@ -47,14 +52,25 @@ class GeneralRow:
 
 
 @dataclass
+class DisqualifiedRow:
+    full_name: str
+    # Points of the day the competitor did fish; the other day is None
+    # (rendered "-"). total_points duplicates the single filled day.
+    points_day1: Optional[int]
+    points_day2: Optional[int]
+    total_points: int
+    weight_grams: int
+
+
+@dataclass
 class GeneralClassification:
     rows: list[GeneralRow]
     duplicate_names: list[str]
-    # Tripwire for data errors: at the final everyone fishes both days, so a
-    # participant of exactly one day is almost certainly a typo fixed on one
-    # day only — and a silent drop would shift everyone below them up a
-    # place. The UI surfaces these names next to the duplicates warning.
-    unpaired_names: list[str]
+    # Participants of exactly one day, rendered by the UI tab and the PDF
+    # as DYSKWALIFIKACJA rows below the classified rows. Doubles as the
+    # typo tripwire: a name misspelled on one day surfaces here instead
+    # of silently shifting everyone below it up a place.
+    disqualified: list[DisqualifiedRow]
     day1_count: int
     day2_count: int
 
@@ -111,19 +127,29 @@ def calculate(
         day2_by_key.pop(key, None)
     duplicate_names = sorted(duplicate_display.values())
 
-    # Names present on exactly one day (after duplicate removal) — omitted
-    # from the table per the organizer's rule, but reported so a typo can't
-    # silently reshuffle the standings. Only meaningful once BOTH days have
-    # participants: before day 2's draw the whole day-1 roster is technically
-    # unpaired, and a red wall of 50 names on the evening of day 1 would be
-    # a false alarm that teaches the operator to ignore the warning.
+    # Names present on exactly one day (after duplicate removal) — shown
+    # as DYSKWALIFIKACJA rows. Only meaningful once BOTH days have
+    # participants: before day 2's draw the whole day-1 roster is
+    # technically unpaired, and 50 disqualification rows on the evening
+    # of day 1 would be a false alarm.
+    disqualified: list[DisqualifiedRow] = []
     if day1_count and day2_count:
-        unpaired_keys = set(day1_by_key) ^ set(day2_by_key)
-        unpaired_names = sorted(
-            (day1_by_key.get(k) or day2_by_key[k]).full_name for k in unpaired_keys
+        for k in set(day1_by_key) ^ set(day2_by_key):
+            c1 = day1_by_key.get(k)
+            c2 = day2_by_key.get(k)
+            c = c1 or c2
+            disqualified.append(
+                DisqualifiedRow(
+                    full_name=c.full_name,
+                    points_day1=c1.sector_points if c1 else None,
+                    points_day2=c2.sector_points if c2 else None,
+                    total_points=c.sector_points,
+                    weight_grams=c.weight_grams,
+                )
+            )
+        disqualified.sort(
+            key=lambda r: (r.total_points, -r.weight_grams, name_key(r.full_name))
         )
-    else:
-        unpaired_names = []
 
     rows: list[GeneralRow] = []
     for key, c1 in day1_by_key.items():
@@ -159,7 +185,7 @@ def calculate(
     return GeneralClassification(
         rows=scored + zero,
         duplicate_names=duplicate_names,
-        unpaired_names=unpaired_names,
+        disqualified=disqualified,
         day1_count=day1_count,
         day2_count=day2_count,
     )

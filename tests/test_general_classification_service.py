@@ -60,7 +60,7 @@ class TestBasicTwoDay:
         day1, day2 = self._build(db)
         result = calculate(db, day1, day2)
         assert result.duplicate_names == []
-        assert result.unpaired_names == []
+        assert result.disqualified == []
         assert (result.day1_count, result.day2_count) == (6, 6)
         assert [(r.place, r.full_name) for r in result.rows] == [
             (1, "Darek"), (2, "Beata"), (3, "Adam"),
@@ -128,7 +128,7 @@ class TestZeroWeight:
 
 
 class TestParticipationFilter:
-    def test_only_day1_participant_omitted(self, db):
+    def test_only_day1_participant_disqualified(self, db):
         day1, _ = _setup_day(db, "2026-09-05", None, {
             "A": [(1, "Adam", 3000), (2, "Tylko Jeden Dzień", 9000)],
         })
@@ -137,10 +137,91 @@ class TestParticipationFilter:
         }, linked_to=day1)
 
         result = calculate(db, day1, day2)
+        # Out of the classified rows, but rendered as a DYSKWALIFIKACJA row
+        # carrying the points and weight of the day actually fished
+        # (9000 g won sector A that day -> 1 pt); the missing day is None.
         assert [r.full_name for r in result.rows] == ["Adam"]
-        # The tripwire: the one-day participant is reported, never silently dropped.
-        assert result.unpaired_names == ["Tylko Jeden Dzień"]
+        assert [
+            (r.full_name, r.points_day1, r.points_day2, r.total_points, r.weight_grams)
+            for r in result.disqualified
+        ] == [("Tylko Jeden Dzień", 1, None, 1, 9000)]
         assert (result.day1_count, result.day2_count) == (2, 1)
+
+    def test_only_day2_participant_disqualified_and_sorted(self, db):
+        # Symmetry: absent on day 1 is disqualified the same way as absent
+        # on day 2. Mixed origins land in one list ordered like the
+        # classification: points ASC, ties by weight DESC — here both won
+        # their sector (1 pt), so 9000 g goes above 8000 g.
+        day1, _ = _setup_day(db, "2026-09-05", None, {
+            "A": [(1, "Adam", 3000), (2, "Tylko Dzień Pierwszy", 9000)],
+        })
+        day2, _ = _setup_day(db, "2026-09-06", None, {
+            "A": [(1, "Adam", 1000), (2, "tylko dzień drugi", 8000)],
+        }, linked_to=day1)
+
+        result = calculate(db, day1, day2)
+        assert [r.full_name for r in result.rows] == ["Adam"]
+        assert [
+            (r.full_name, r.points_day1, r.points_day2, r.total_points, r.weight_grams)
+            for r in result.disqualified
+        ] == [
+            ("Tylko Dzień Pierwszy", 1, None, 1, 9000),
+            ("tylko dzień drugi", None, 1, 1, 8000),
+        ]
+
+    def test_disqualified_sorted_by_points_before_weight(self, db):
+        # Points decide even when weight points the other way: 1 pt / 900 g
+        # must stand above 2 pts / 2500 g. Kills a sort that drops or
+        # flips the points term.
+        day1, _ = _setup_day(db, "2026-09-05", None, {
+            "A": [(1, "Adam", 3000), (2, "Słaby Wynik", 2500)],
+        })
+        day2, _ = _setup_day(db, "2026-09-06", None, {
+            "A": [(1, "Adam", 500), (2, "Mocny Wynik", 900)],
+        }, linked_to=day1)
+
+        result = calculate(db, day1, day2)
+        assert [
+            (r.full_name, r.total_points, r.weight_grams) for r in result.disqualified
+        ] == [("Mocny Wynik", 1, 900), ("Słaby Wynik", 2, 2500)]
+
+    def test_disqualified_full_tie_ordered_by_name(self, db):
+        # Same points, same weight -> deterministic name_key order
+        # (case-insensitive), the last-resort key.
+        day1, _ = _setup_day(db, "2026-09-05", None, {
+            "A": [(1, "Adam", 3000), (2, "Bogdan Remis", 5000)],
+        })
+        day2, _ = _setup_day(db, "2026-09-06", None, {
+            "A": [(1, "Adam", 1000), (2, "aneta remis", 5000)],
+        }, linked_to=day1)
+
+        result = calculate(db, day1, day2)
+        assert [r.full_name for r in result.disqualified] == [
+            "aneta remis", "Bogdan Remis",
+        ]
+
+    def test_zero_weight_one_day_participant_disqualified_with_zero(self, db):
+        # The DQ rules deliberately diverge from the classified zero-weight
+        # rule: the weight stays a number (0, not "-") and the row is
+        # ordered by points first — a 0 g row with fewer points stands
+        # above a heavier one with more.
+        day1, _ = _setup_day(db, "2026-09-05", None, {
+            "A": [(1, "Adam", 3000), (2, "Zero Waga", 0)],
+            "B": [(6, "Beata", 2000), (7, "Celina", 1500)],
+        })
+        day2, _ = _setup_day(db, "2026-09-06", None, {
+            "A": [(1, "Adam", 1000)],
+            "B": [(6, "Beata", 900), (7, "Celina", 800), (8, "Trzy Punkty", 700)],
+        }, linked_to=day1)
+
+        result = calculate(db, day1, day2)
+        assert [
+            (r.full_name, r.points_day1, r.points_day2, r.total_points, r.weight_grams)
+            for r in result.disqualified
+        ] == [
+            ("Zero Waga", 2, None, 2, 0),
+            ("Trzy Punkty", None, 3, 3, 700),
+        ]
 
     def test_on_roster_but_no_station_counts_as_absent(self, db):
         day1, _ = _setup_day(db, "2026-09-05", None, {
@@ -155,14 +236,18 @@ class TestParticipationFilter:
 
         result = calculate(db, day1, day2)
         assert [r.full_name for r in result.rows] == ["Adam"]
-        assert result.unpaired_names == ["Bez Stanowiska"]
+        # 2000 g behind Adam's 3000 g in sector A -> 2 pts on the day fished.
+        assert [
+            (r.full_name, r.points_day1, r.points_day2, r.total_points, r.weight_grams)
+            for r in result.disqualified
+        ] == [("Bez Stanowiska", 2, None, 2, 2000)]
 
 
-class TestUnpairedSuppression:
+class TestDisqualificationSuppression:
     def test_no_false_alarm_before_day2_draw(self, db):
         # Day 2 created (roster copied) but nobody has drawn a station yet —
         # the evening of day 1. The whole day-1 roster is technically
-        # unpaired, but reporting it would be a false alarm.
+        # unpaired, but 50 DYSKWALIFIKACJA rows would be a false alarm.
         day1, _ = _setup_day(db, "2026-09-05", None, {
             "A": [(1, "Adam", 3000), (2, "Beata", 2000)],
         })
@@ -173,8 +258,24 @@ class TestUnpairedSuppression:
 
         result = calculate(db, day1, day2)
         assert result.rows == []
-        assert result.unpaired_names == []
+        assert result.disqualified == []
         assert (result.day1_count, result.day2_count) == (2, 0)
+
+    def test_no_false_alarm_when_day1_has_no_draw(self, db):
+        # Mirror direction of the guard: day-1 roster exists but nobody
+        # has a station while day 2 is already drawn.
+        day1, _ = _setup_day(db, "2026-09-05", None, {})
+        competitor_repo.add(db, day1, 1, "Adam")
+        competitor_repo.add(db, day1, 2, "Beata")
+        db.commit()
+        day2, _ = _setup_day(db, "2026-09-06", None, {
+            "A": [(1, "Adam", 3000), (2, "Beata", 2000)],
+        }, linked_to=day1)
+
+        result = calculate(db, day1, day2)
+        assert result.rows == []
+        assert result.disqualified == []
+        assert (result.day1_count, result.day2_count) == (0, 2)
 
 
 class TestNameMatching:
@@ -202,7 +303,7 @@ class TestNameMatching:
 
         result = calculate(db, day1, day2)
         assert result.duplicate_names == ["Jan Kowalski"]
-        assert result.unpaired_names == []
+        assert result.disqualified == []
         assert [r.full_name for r in result.rows] == ["Adam"]
 
 

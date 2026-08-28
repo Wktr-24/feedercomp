@@ -62,10 +62,14 @@ tylko finał dwudniowy — `wymagania.md` §I).
    z przydzielonym stanowiskiem w OBU dniach; parowanie po `utils.name_key`
    (normalize + casefold); suma pkt sektorowych ASC → suma wag DESC;
    ex aequo 1, 2, 2, 4; suma wag 0 → „-" na końcu
-3. Obecny jeden dzień → całkowicie pomijany (decyzja organizatora)
+3. Obecny jeden dzień → wiersz "DYSKWALIFIKACJA" na końcu tabeli (nazwisko
+   + punkty i waga z dnia, w którym łowił, suma pkt = ten jeden dzień,
+   brakujący dzień „-"; między sobą sortowani pkt ASC, waga DESC);
+   wyciszone, dopóki któryś dzień nie ma uczestników (bezpiecznik przed
+   fałszywym alarmem wieczorem dnia 1)
 4. Duplikaty nazwisk w ramach zawodów są blokowane przy dodawaniu/edycji
    (`competitor_repo.name_exists`); ewentualne historyczne duplikaty generalka
-   wyklucza z ostrzeżeniem
+   wyklucza z ostrzeżeniem (bez wiersza DYSKWALIFIKACJA)
 
 ## Polecenia
 
@@ -107,6 +111,14 @@ build.bat
   `name_exists`, `create_day2`, `_participants_by_key`)
 - Raport duplikatów z numerami listy ("Jan Kowalski (nr 12, 37)")
 - Retencja/porządkowanie starych PDF-ów w `%TEMP%\FeederComp`
+- Osierocone `sector_points`: usunięcie stanowiska zawodnika nie czyści
+  jego punktów sektorowych (przelicz też ich nie zeruje — liczy tylko
+  zawodników z sektorem), a `get_winners` filtruje wyłącznie po punktach
+  (bez sprawdzenia stanowiska) — osoba bez stanowiska z takimi osieroconymi
+  punktami może trafić na koniec listy zwycięzców dnia. Naprawa: czyścić
+  `sector_points`/`sector_place` przy zdejmowaniu stanowiska + filtr
+  `sector_name is not None` w `get_winners`. (Klasyfikacje dzienna
+  i generalna są odporne — filtrują po stanowisku.)
 - Inwarianty do pilnowania: mutacje linku dnia 1↔2 wyłącznie z ekranu
   startowego (cache `_linked_pair` w ResultsScreen na tym polega); migracje
   kluczują po NAZWACH łowisk — nie dodawać edycji nazwy venue bez przemyślenia;

@@ -268,8 +268,21 @@ class PrintService:
                 str(row.total_points),
                 format_weight_kg(row.total_weight_grams),
             ])
+        for row in result.disqualified:
+            data.append([
+                "DYSKWALIFIKACJA",
+                row.full_name,
+                str(row.points_day1) if row.points_day1 is not None else "-",
+                str(row.points_day2) if row.points_day2 is not None else "-",
+                str(row.total_points),
+                format_weight_kg(row.weight_grams),
+            ])
 
-        col_widths = [55, 185, 55, 55, 70, 80]
+        # MIEJSCE must fit a "DYSKWALIFIKACJA" cell (95.5pt at 9pt body font
+        # incl. cell padding); the name column stays wide enough for long
+        # double-barrelled names — ReportLab neither wraps nor clips
+        # plain-string cells, an over-wide one paints over its neighbour.
+        col_widths = [97, 179, 48, 48, 66, 72]
         table = Table(data, colWidths=col_widths, repeatRows=1)
         table.setStyle(self._table_style())
         elements.append(table)
